@@ -897,7 +897,7 @@ class ReviewPage(QWidget):
         elif self.items:
             self.list.setCurrentRow(min(i, len(self.items) - 1))
         if msg:
-            self.info.setText(msg + '\n' + self.info.text())
+            self.info.setText(html.escape(msg) + '<br>' + self.info.text())     # info is rich text
 
     def save_label(self):
         i = self.list.currentRow()
