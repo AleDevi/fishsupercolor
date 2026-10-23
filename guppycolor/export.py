@@ -8,8 +8,9 @@ FIXED_COLUMNS = [
     'file', 'folder', '{pattern}', 'date_taken', 'camera', 'exposure_s', 'iso', 'focal_mm',
     'colour_chart', 'correction', 'reference_photo', 'chart_error_de00',
     'px_per_mm', 'scale_source', 'parts_included',
-    'standard_length_mm', 'landmarks_source', 'total_length_mm', 'total_length_source', 'mask_length_mm', 'max_depth_mm',
-    'fish_area_mm2', 'body_area_mm2', '{colori}',
+    'standard_length_mm', 'landmarks_source', 'total_length_mm', 'total_length_source', 'mask_length_mm',
+    'caudal_length_mm', 'max_depth_mm', 'depth_source', 'fish_area_mm2', 'body_area_mm2', 'body_area_source',
+    'caudal_area_mm2', '{colori}',
     'label_id', 'label_group', 'label_date', 'label_text', 'label_source',
     'label_confidence', 'label_needs_review', 'analysis',
     'fish_brightness', 'saturated_pct', 'sharpness', 'fish_confidence', 'status', 'flags', 'path',
@@ -93,9 +94,13 @@ def rows(project):
             'total_length_mm': _num(mm(r.get('total_length_px')), 2),      # NA when the tail is not all in the mask
             'total_length_source': r.get('total_length_source') or 'NA',     # outline, or snout -> tail tip landmarks
             'mask_length_mm': _num(mm(r.get('mask_length_px')), 2),
+            'caudal_length_mm': _num(mm(r.get('caudal_length_px')), 2),    # peduncle end -> tail tip landmarks
             'max_depth_mm': _num(mm(r.get('max_depth_px')), 2),
+            'depth_source': r.get('depth_source') or 'NA',                   # landmarks (gonopodium base) or outline
             'fish_area_mm2': _num(mm2(r.get('fish_area_px')), 2),
             'body_area_mm2': _num(mm2(r.get('body_area_px')), 2),
+            'body_area_source': r.get('body_area_source') or 'NA',           # cut at the peduncle landmark or outline
+            'caudal_area_mm2': _num(mm2(r.get('caudal_area_px')), 2),      # NA when the fin is not in the outline
             'fish_confidence': _num(r.get('fish_confidence'), 3),
             'fish_brightness': _num(r.get('fish_brightness'), 1), 'saturated_pct': _num(r.get('saturated_pct'), 2),
             'sharpness': _num(r.get('sharpness'), 2),

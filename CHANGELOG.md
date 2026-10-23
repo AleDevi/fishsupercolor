@@ -10,6 +10,27 @@
 - Verified update from GitHub releases (off while the repository is private).
 - Landmark model export as plain tensors (safetensors/npz) rebuilt locally on import, so a shared file never goes through an unpickler (security review suggestion).
 
+## 0.10.0 (2026-10-23)
+- **Landmarks win over the outline** (new module `sizes.py`), as soon as they are clicked on screen 8 or predicted:
+  - TL = snout -> tail tip whenever the tail tip is marked (`total_length_source = landmarks`), even if the
+    outline has the fin;
+  - the end of the body is the line across the fish at the peduncle landmark: `body_area_mm2` is the outline
+    before it (`body_area_source = landmarks`), `caudal_area_mm2` the outline after it (only when the fin is in
+    the outline);
+  - the fin counts as in the outline when the outline reaches 85% of the way from the peduncle to the tail tip;
+  - new `caudal_length_mm` = peduncle end -> tail tip;
+  - **maximum depth** across the body (perpendicular to snout -> peduncle) at the base of the gonopodium
+    (`depth_source = landmarks`), else the widest point of the outline.
+  Removing the landmarks gives the outline values back. Results draws these lines in blue (TL dashed).
+- **Review** shows each photo in separate views, **Fish** (outline and measures), **Label** (the label close up, or
+  the whole photo when it was not found, with the id box) and **Scale** (the whole photo, Confirm / Calibrate).
+  Views with something to check have a warning sign and list their problems; the screen opens on the most
+  important one.
+- **Add to the outline** is now a click mode in the Fish view ("A click on the fish: redoes the whole outline /
+  adds the part you click"). After a click the photo stays on screen with the new outline, and a message says how
+  much the outline grew, whether the tail fin is now in it and what is left to check; if nothing new was found, it
+  says so.
+
 ## 0.9.0 (2026-10-23)
 - Results: the table now has `standard_length_mm` and `total_length_mm`; a line says on how many photos SL is
   known and how to get it (landmarks on screen 8). Click a row to see the photo with its measures drawn

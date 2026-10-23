@@ -44,6 +44,7 @@ def save(project, photo, points):
     if not points:
         if os.path.exists(p):
             os.remove(p)
+        update_result(project, photo, {})
         return
     points = {k: [round(float(v[0]), 1), round(float(v[1]), 1)] for k, v in points.items()}
     data = {'points': points, 'annotator': project.settings.get('training', {}).get('annotator', ''),
@@ -51,19 +52,25 @@ def save(project, photo, points):
     with open(p + '.tmp', 'w', encoding='utf-8') as f:
         json.dump(data, f, indent=1)
     os.replace(p + '.tmp', p)
-    r = project.load_result(photo)                 # SL in the results straight away, no new analysis needed
-    if r is not None:
-        sl = standard_length_px(points)
+    update_result(project, photo, points)
+
+
+def update_result(project, photo, points):
+    """Sizes in the results straight away (SL, TL, end of the body, depth), no new analysis needed."""
+    from . import sizes, training
+    r = project.load_result(photo)
+    if r is None:
+        return
+    if points:
         r.update(landmarks=points, landmarks_source='manual')
-        if sl:
-            r['standard_length_px'] = round(sl, 1)
-        tl = pipeline.landmarks_tl(points)
-        if tl and r.get('total_length_source') != 'outline':     # the fin is not all in the outline
-            r['total_length_px'], r['total_length_source'] = round(tl, 1), 'landmarks'
-        elif not tl and r.get('total_length_source') == 'landmarks':
-            r.pop('total_length_px', None); r.pop('total_length_source', None)
-        r['flags'] = ';'.join(f for f in (r.get('flags') or '').split(';') if f and f != 'sl_landmarks_missing')
-        project.save_result(photo, r)
+    else:
+        r.pop('landmarks', None); r.pop('landmarks_source', None)
+    if 'outline' not in r:          # analysed before 0.10: what the outline gave is what is in the result
+        r['outline'] = {k: r[k] for k in ('body_area_px', 'max_depth_px', 'mask_length_px') if k in r}
+        r['outline']['fin_found'] = bool(r.get('caudal_in_mask'))
+    flags = sizes.update(r, training.fish_mask(project, photo), points, (r.get('flags') or '').split(';'))
+    r['flags'] = ';'.join(flags)
+    project.save_result(photo, r)
 
 
 def annotated(project):

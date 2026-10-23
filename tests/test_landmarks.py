@@ -258,3 +258,44 @@ def test_crop_has_room_at_head_and_tail():
     mask[450:550, 600:1400] = True
     x0, y0, x1, y1 = landmarks.crop_box(mask, mask.shape)
     assert 600 - x0 >= 0.29 * 800 and x1 - 1400 >= 0.29 * 800 and 450 - y0 < 600 - x0
+
+
+def test_landmarks_win_over_the_outline():
+    """Tail tip -> TL even when the outline misses the fin; body cut at the peduncle landmark; depth across the
+    body at the gonopodium base; removing the landmarks gives the outline values back."""
+    import numpy as np
+    from guppycolor import sizes
+    mask = np.zeros((300, 800), bool)
+    mask[100:200, 100:500] = True              # body
+    mask[140:160, 500:560] = True              # peduncle, the transparent fin is missing
+    r = {'outline': {'body_area_px': 999, 'max_depth_px': 50.0, 'mask_length_px': 460.0, 'fin_found': False,
+                     'axis': [1.0, 0.0]}}
+    pts = {'snout': [100, 150], 'peduncle_end': [560, 150], 'tail_tip': [700, 150], 'gonopodium_base': [300, 200]}
+    flags = sizes.update(r, mask, pts, ['blurry'])
+    assert r['standard_length_px'] == 460 and r['total_length_px'] == 600 and r['total_length_source'] == 'landmarks'
+    assert r['body_area_source'] == 'landmarks' and r['body_area_px'] == mask.sum()
+    assert r['depth_source'] == 'landmarks' and abs(r['max_depth_px'] - 99.5) < 1.5
+    assert r['caudal_length_px'] == 140 and 'caudal_area_px' not in r and flags == ['blurry', 'tail_incomplete']
+    mask[110:190, 560:700] = True              # fin added to the outline (e.g. in Review)
+    flags = sizes.update(r, mask, pts, flags)
+    assert r['caudal_in_mask'] and r['caudal_area_px'] == 80 * 139 and flags == ['blurry']
+    flags = sizes.update(r, mask, {}, flags)
+    assert r['body_area_px'] == 999 and r['max_depth_px'] == 50.0 and 'standard_length_px' not in r
+    assert 'tail_incomplete' in flags
+    flags = sizes.update(r, mask, {'snout': [100, 150]}, [])
+    assert 'sl_landmarks_missing' in flags
+
+
+def test_clicked_landmarks_update_sizes_without_new_analysis(photos):
+    from guppycolor import landmarks
+    p = analysed(photos)
+    photo = [ph for _, ph in p.photos()][0]
+    r0 = p.load_result(photo)
+    landmarks.save(p, photo, {'snout': [650.0, 645.0], 'peduncle_end': [1100.0, 650.0], 'tail_tip': [1290.0, 650.0],
+                              'gonopodium_base': [900.0, 715.0]})
+    r = p.load_result(photo)
+    assert r['total_length_source'] == 'landmarks' and r['depth_source'] == 'landmarks'
+    assert r['body_area_px'] < r0['fish_area_px'] and r['body_end_line'] and r['depth_line']
+    landmarks.save(p, photo, {})
+    r = p.load_result(photo)
+    assert r['depth_source'] == 'outline' and 'standard_length_px' not in r and 'landmarks' not in r

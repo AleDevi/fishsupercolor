@@ -9,7 +9,7 @@ import cv2
 import numpy as np
 from PIL import Image, ImageOps
 
-from . import metadata
+from . import metadata, sizes
 from .engine import colour, morpho, scale
 
 CHART_MAX_ERR = 0.1      # find_chart pattern error above this = no usable chart
@@ -175,7 +175,8 @@ def landmarks_tl(points):
 
 
 def find_landmarks(project, photo, img, mask, r):
-    """Landmarks clicked by hand (screen 8) win; otherwise the landmark model, if one is chosen. SL from them."""
+    """Landmarks clicked by hand (screen 8) win; otherwise the landmark model, if one is chosen (sizes from them
+    in sizes.update)."""
     from . import landmarks
     pts, src = landmarks.load(project, photo), 'manual'
     name = project.settings.get('landmarks', {}).get('model')
@@ -187,11 +188,7 @@ def find_landmarks(project, photo, img, mask, r):
     if not pts:
         return []
     r.update(landmarks=pts, landmarks_source=src)
-    sl = landmarks.standard_length_px(pts)
-    if sl:
-        r['standard_length_px'] = round(sl, 1)
-        return []
-    return ['sl_landmarks_missing']
+    return []
 
 
 def analysis_mode(r, photo, settings):
@@ -418,18 +415,12 @@ def analyse(project, folder, photo, segmenter=None, reference=None, expected_ids
         sc, f = photo_scale(project, folder, photo, img, mask)
         r.update(sc); flags += f
         morph = morpho.measure(mask, img, head=None if st.get('head', 'left') == 'auto' else st.get('head', 'left'))
-        r.update(fish_area_px=morph['area_px'], body_area_px=morph['body_area_px'],
-                 mask_length_px=round(morph['tl_px'], 1), max_depth_px=round(morph['max_depth_px'], 1),
-                 caudal_in_mask=morph['fin_found'])
+        r.update(fish_area_px=morph['area_px'], mask_length_px=round(morph['tl_px'], 1))
+        r['outline'] = {'body_area_px': morph['body_area_px'], 'max_depth_px': round(morph['max_depth_px'], 1),
+                        'mask_length_px': r['mask_length_px'], 'fin_found': morph['fin_found'],
+                        'axis': [round(float(v), 4) for v in morph['axis']]}
         flags += find_landmarks(project, photo, img, mask, r)
-        # with the whole caudal fin in the mask, the mask length is the total length (TL)
-        if morph['fin_found']:
-            r['total_length_px'], r['total_length_source'] = r['mask_length_px'], 'outline'
-        else:
-            flags.append('tail_incomplete')
-            tl = landmarks_tl(r.get('landmarks') or {})       # snout -> tail tip clicked or predicted
-            if tl:
-                r['total_length_px'], r['total_length_source'] = round(tl, 1), 'landmarks'
+        flags = sizes.update(r, mask, r.get('landmarks'), flags)     # landmarks win over the outline
         flags += mask_flags(mask, morph)
         r.update(image_quality(img, mask))
         if r['saturated_pct'] > 1:

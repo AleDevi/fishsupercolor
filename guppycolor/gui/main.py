@@ -10,7 +10,7 @@ from PySide6.QtWidgets import (
     QApplication, QButtonGroup, QCheckBox, QDoubleSpinBox, QFileDialog, QFormLayout, QGroupBox, QHBoxLayout,
     QHeaderView, QInputDialog, QLabel, QLineEdit, QListWidget, QListWidgetItem, QMainWindow, QMessageBox,
     QFrame, QProgressBar, QPushButton, QRadioButton, QScrollArea, QSizePolicy, QSplitter, QStackedWidget,
-    QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget,
+    QTabBar, QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget,
 )
 
 from .. import __version__, export, metadata, pipeline, profile, scaleline
@@ -34,7 +34,7 @@ FLAG_LABEL = {
     'area_outlier': 'area very different from the other fish of the session',
     'label_uncertain': 'label read with low confidence: check the id',
     'colours_uncertain': 'the colour model is unsure on this fish: a good photo to paint in Training',
-    'tail_incomplete': 'caudal fin not all in the outline: no total length',
+    'tail_incomplete': 'caudal fin not all in the outline: add it (Fish view), or mark the tail tip on screen 8 for TL',
     'date_mismatch': 'the date on the label differs from the date the photo was taken',
     'overexposed': 'more than 1% of the fish is burnt out (white)',
     'blurry': 'much less sharp than the other photos of the session',
@@ -638,43 +638,99 @@ def load_pixmap(path):
     return QPixmap.fromImage(r.read())
 
 
+LABEL_FLAGS = {'label_uncertain', 'date_mismatch'}
+VIEWS = ('Fish', 'Label', 'Scale')
+
+
+def view_of(flag):
+    """Which part of the photo a flag is about."""
+    if flag in scaleline.SCALE_FLAGS:
+        return 'Scale'
+    return 'Label' if flag in LABEL_FLAGS else 'Fish'
+
+
 class ReviewPage(QWidget):
     def __init__(self, win):
         super().__init__()
         self.win = win
         lay = QVBoxLayout(self)
         lay.addWidget(h1('4  Review'))
-        lay.addWidget(note('Most uncertain photos first. Fish not found or wrong outline? Click once on the fish '
-                           'in the photo and the outline is redone.'))
+        lay.addWidget(note('Most uncertain photos first. Each photo shows what needs a look in separate views: '
+                           'Fish (outline and measures), Label (the written id), Scale (graph paper or ruler). '
+                           'Views with a \u26a0 have something to check.'))
         split = QSplitter()
         self.list = QListWidget()
         self.list.currentRowChanged.connect(self.show_item)
         split.addWidget(self.list)
         right = QWidget()
         rl = QVBoxLayout(right)
+        self.info = note('')
+        rl.addWidget(self.info)
+        self.views = QTabBar()
+        for v in VIEWS:
+            self.views.addTab(v)
+        self.views.currentChanged.connect(lambda _: self.show_view())
+        rl.addWidget(self.views)
+        self.issues = QLabel()
+        self.issues.setWordWrap(True)
+        self.issues.setStyleSheet('color: #B3261E; font-weight: 600')
+        rl.addWidget(self.issues)
         self.image = ClickLabel()
         self.image.setAlignment(Qt.AlignCenter)
-        self.image.setCursor(Qt.CrossCursor)
         self.image.clicked.connect(self.click_fish)
         self.shown = None           # (pixmap size, crop box in original pixels) of the picture on screen
         self.image.setMinimumSize(400, 300)
+        self.image.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Ignored)
         rl.addWidget(self.image, 1)
-        self.info = note('')
-        rl.addWidget(self.info)
-        self.lab_box = QGroupBox('Label')
-        ll = QHBoxLayout(self.lab_box)
-        self.lab_img = QLabel()
-        self.lab_img.setFixedHeight(90)
+        self.tools = QStackedWidget()
+        # Fish: what a click on the photo does
+        fish = QWidget()
+        fl = QVBoxLayout(fish)
+        fl.setContentsMargins(0, 0, 0, 0)
+        row = QHBoxLayout()
+        row.addWidget(QLabel('A click on the fish:'))
+        self.mode_redo = QRadioButton('redoes the whole outline')
+        self.mode_add = QRadioButton('adds the part you click to the outline (e.g. a transparent tail)')
+        self.mode_redo.setChecked(True)
+        for b in (self.mode_redo, self.mode_add):
+            row.addWidget(b)
+        row.addStretch()
+        fl.addLayout(row)
+        self.fish_note = note('Lines: magenta outline, cyan midline (mask length), green snout, red end of the '
+                              'outline, orange end of the body, yellow maximum depth, blue from the landmarks '
+                              '(legend in 5 Results).')
+        fl.addWidget(self.fish_note)
+        self.tools.addWidget(fish)
+        # Label: the id written on the label
+        lab = QWidget()
+        ll = QHBoxLayout(lab)
+        ll.setContentsMargins(0, 0, 0, 0)
+        self.lab_text = QLabel()
+        self.lab_text.setWordWrap(True)
         self.lab_id = QLineEdit()
         self.lab_id.setPlaceholderText('fish id')
         b_lab = QPushButton('Save id')
         b_lab.clicked.connect(self.save_label)
         self.lab_id.returnPressed.connect(self.save_label)
-        ll.addWidget(self.lab_img, 1)
+        ll.addWidget(self.lab_text, 1)
         ll.addWidget(self.lab_id)
         ll.addWidget(b_lab)
-        rl.addWidget(self.lab_box)
-        self.lab_box.hide()
+        self.tools.addWidget(lab)
+        # Scale
+        sc = QWidget()
+        sl = QHBoxLayout(sc)
+        sl.setContentsMargins(0, 0, 0, 0)
+        self.b_confirm = QPushButton('Confirm scale (the red line is 2 cm)')
+        self.b_confirm.clicked.connect(self.confirm_scale)
+        self.b_cal = QPushButton('Calibrate manually (draw a known length)')
+        self.b_cal.clicked.connect(self.start_calibration)
+        self.scale_text = QLabel()
+        self.scale_text.setWordWrap(True)
+        sl.addWidget(self.scale_text, 1)
+        sl.addWidget(self.b_confirm)
+        sl.addWidget(self.b_cal)
+        self.tools.addWidget(sc)
+        rl.addWidget(self.tools)
         row = QHBoxLayout()
         for text, fn in (('Accept (Enter)', lambda: self.decide('reviewed')), ('Exclude the photo', lambda: self.decide('excluded')),
                          ('Size only', lambda: self.set_analysis('size')),
@@ -687,64 +743,105 @@ class ReviewPage(QWidget):
                 b.setShortcut(Qt.Key_Return)
         row.addStretch()
         rl.addLayout(row)
-        row = QHBoxLayout()
-        self.b_confirm = QPushButton('Confirm scale (the red line is 2 cm)')
-        self.b_confirm.clicked.connect(self.confirm_scale)
-        self.b_add = QPushButton('Add to the outline (then click the missing part, e.g. the tail)')
-        self.b_add.setCheckable(True)
-        self.b_add.setToolTip('The next click on the photo adds that part to the outline instead of redoing it')
-        row.addWidget(self.b_add)
-        self.b_cal = QPushButton('Calibrate manually (draw a known length)')
-        self.b_cal.clicked.connect(self.start_calibration)
-        row.addWidget(self.b_confirm)
-        row.addWidget(self.b_cal)
-        row.addStretch()
-        rl.addLayout(row)
         split.addWidget(right)
         split.setSizes([260, 800])
         lay.addWidget(split, 1)
         self.items = []
+        self.base = None
+        self.keep = None            # photo to keep in the list after an outline change, even if it is now ok
 
     def show_project(self, p):
         order = {'error': 0, 'to_check': 1}
-        self.items = sorted((r for r in p.results() if r.get('status') in order),
-                            key=lambda r: (order[r['status']], -len((r.get('flags') or '').split(';'))))
+        self.items = sorted((r for r in p.results() if r.get('status') in order or r['path'] == self.keep),
+                            key=lambda r: (order.get(r['status'], 2), -len((r.get('flags') or '').split(';'))))
         self.list.clear()
         for r in self.items:
             it = QListWidgetItem(f"{r['file']}\n{flags_text(r.get('flags')).splitlines()[0]}")
-            it.setForeground(QColor(STATUS_COLOUR[r['status']]))
+            it.setForeground(QColor(STATUS_COLOUR.get(r['status'], '#1F6FB2')))
             self.list.addItem(it)
         if self.items:
             self.list.setCurrentRow(0)
         else:
             self.image.clear()
+            self.issues.clear()
             self.info.setText('Nothing to check.')
+
+    def flags_by_view(self, r):
+        out = {v: [] for v in VIEWS}
+        for f in (r.get('flags') or '').split(';'):
+            if f:
+                out[view_of(f)].append(f)
+        if r.get('label_needs_review') and not out['Label']:
+            out['Label'].append('label_uncertain')
+        return out
 
     def show_item(self, i):
         if not 0 <= i < len(self.items):
             return
         r = self.items[i]
-        scale_issue = bool(set((r.get('flags') or '').split(';')) & scaleline.SCALE_FLAGS)
-        img = os.path.join(self.win.project.path, 'check', r['photo_id'] + '.jpg')
-        if os.path.exists(img) and r.get('check_box') and not scale_issue:
-            pm, box = load_pixmap(img), r['check_box']
-        else:                                   # whole photo: the paper or ruler may be far from the fish
+        mode = {'size': 'size only', 'size_colour': 'size + colour'}.get(r.get('analysis'), '')
+        status = STATUS_LABEL.get(r.get('status'), r.get('status'))
+        self.info.setText(f"<b>{r['file']}</b> ({r['folder']}) · {mode} · {status}")
+        by = self.flags_by_view(r)
+        serious = [v for v in VIEWS if any(f in pipeline.SERIOUS or f == 'fish_not_found' for f in by[v])]
+        any_flag = [v for v in VIEWS if by[v]]
+        self.views.blockSignals(True)
+        for k, v in enumerate(VIEWS):
+            self.views.setTabText(k, ('\u26a0 ' if by[v] else '') + v)
+        start = (serious or any_flag or ['Fish'])[0]
+        self.views.setCurrentIndex(VIEWS.index(start))
+        self.views.blockSignals(False)
+        self.show_view()
+
+    def show_view(self):
+        r = self.current()
+        if r is None:
+            return
+        v = VIEWS[self.views.currentIndex()]
+        self.tools.setCurrentIndex(VIEWS.index(v))
+        fl = self.flags_by_view(r)[v]
+        self.issues.setText('\n'.join(FLAG_LABEL.get(f, f) for f in fl) if fl else 'Nothing to check here.')
+        self.issues.setStyleSheet('color: %s; font-weight: 600' % ('#B3261E' if fl else '#2E7D32'))
+        self.image.setCursor(Qt.CrossCursor if v == 'Fish' else Qt.ArrowCursor)
+        pm_full = None
+        lines = []
+        if v == 'Fish':
+            pm = measures_pixmap(self.win.project, r)
+            if pm is not None and not pm.isNull():
+                box = r['check_box']
+            else:
+                pm_full = pm = load_pixmap(r['path'])
+                box = [0, 0, pm.width(), pm.height()]
+        elif v == 'Label':
+            pm_full = load_pixmap(r['path'])
+            b = r.get('label_box')
+            if b:                               # the label with some room around it
+                x, y, w, h = b
+                pad = int(0.6 * max(w, h))
+                box = [max(0, x - pad), max(0, y - pad), min(pm_full.width(), x + w + pad),
+                       min(pm_full.height(), y + h + pad)]
+            else:                               # not found: the whole photo, to read it anywhere
+                box = [0, 0, pm_full.width(), pm_full.height()]
+            pm = pm_full.copy(box[0], box[1], box[2] - box[0], box[3] - box[1])
+            self.lab_id.setText(r.get('label_id') or '')
+            self.lab_text.setText('Read on the label: ' + (r.get('label_text') or 'no text') +
+                                  ('' if b else '\n(label not found: the whole photo is shown)'))
+        else:
             pm = load_pixmap(r['path'])
             box = [0, 0, pm.width(), pm.height()]
+            line = r.get('scale_line')
+            if line:
+                lines = [line]
+            self.b_confirm.setVisible(bool(line))
+            if r.get('px_per_mm'):
+                self.scale_text.setText(f"Scale: {r['px_per_mm']:.2f} px/mm ({r.get('scale_source') or '?'}"
+                                        + (f", {r['scale_squares']} squares" if r.get('scale_squares') else '') + ')'
+                                        + ('. If the red line covers 2 cm, Confirm; otherwise Calibrate manually.'
+                                           if line else ''))
+            else:
+                self.scale_text.setText('No scale: Calibrate manually.')
         self.base = (pm, box)
-        line = r.get('scale_line') if scale_issue else None
-        self.draw([line] if line else [])
-        self.b_confirm.setVisible(bool(line))
-        mode = {'size': 'size only', 'size_colour': 'size + colour'}.get(r.get('analysis'), '')
-        text = f"{r['file']} ({r['folder']}) · {mode}\n{flags_text(r.get('flags'))}"
-        if box is r.get('check_box'):
-            text += ('\nLines: magenta outline, cyan midline (mask length), green snout, red end of the outline, '
-                     'orange end of the body, yellow maximum depth (legend in 5 Results).')
-        if line:
-            text += (f"\nScale found: {r['px_per_mm']:.2f} px/mm over {r.get('scale_squares') or '?'} squares. "
-                     'If the red line covers 2 cm (20 squares), Confirm; otherwise Calibrate manually.')
-        self.info.setText(text)
-        self.show_label(r)
+        self.draw(lines)
 
     def draw(self, lines, points=()):
         """Photo on screen with red lines/points given in photo pixels."""
@@ -801,22 +898,6 @@ class ReviewPage(QWidget):
         if msg:
             self.info.setText(msg + '\n' + self.info.text())
 
-    def show_label(self, r):
-        box = r.get('label_box')
-        if not (box or r.get('label_needs_review')):
-            self.lab_box.hide()
-            return
-        self.lab_box.show()
-        self.lab_id.setText(r.get('label_id') or '')
-        self.lab_box.setTitle('Label read: ' + (r.get('label_text') or 'no text'))
-        self.lab_img.clear()
-        if box:
-            x, y, w, h = box
-            pad = int(0.2 * max(w, h))
-            full = load_pixmap(r['path'])
-            crop = full.copy(max(0, x - pad), max(0, y - pad), w + 2 * pad, h + 2 * pad)
-            self.lab_img.setPixmap(crop.scaledToHeight(90, Qt.SmoothTransformation))
-
     def save_label(self):
         i = self.list.currentRow()
         if not 0 <= i < len(self.items) or not self.lab_id.text().strip():
@@ -827,7 +908,7 @@ class ReviewPage(QWidget):
 
     def click_fish(self, x, y):
         i = self.list.currentRow()
-        if self.shown is None or not 0 <= i < len(self.items):
+        if self.shown is None or not 0 <= i < len(self.items) or VIEWS[self.views.currentIndex()] != 'Fish':
             return
         pw, ph, (x0, y0, x1, y1) = self.shown
         fx = (x - (self.image.width() - pw) / 2) / pw
@@ -836,18 +917,21 @@ class ReviewPage(QWidget):
             return
         r, p = self.items[i], self.win.project
         photo = r['path']
+        adding = self.mode_add.isChecked()
+        before = r.get('fish_area_px')
         QApplication.setOverrideCursor(Qt.WaitCursor)
         try:
             from ..engine import segment
             img = pipeline.load_image(photo)
             X, Y = x0 + fx * (x1 - x0), y0 + fy * (y1 - y0)
-            if self.b_add.isChecked():
+            if adding:
                 from .. import training
                 old = training.fish_mask(p, photo)
                 mask = segment.add_to_mask(img, old, X, Y) if old is not None else None
-                self.b_add.setChecked(False)
-                if mask is None:
-                    raise ValueError('nothing next to the outline there: click on the missing part, close to the fish')
+                if mask is None or mask.sum() <= old.sum():
+                    raise ValueError('nothing new was found next to the outline at that point. Click on the '
+                                     'missing part itself, close to the fish (for a very transparent tail try '
+                                     'its darker rays or its edge).')
             else:
                 mask = segment.segment_fish_click(img, X, Y)
             areas = [o['fish_area_px'] for o in p.results() if o.get('fish_area_px') and o['path'] != photo]
@@ -862,17 +946,30 @@ class ReviewPage(QWidget):
                 if not keep:
                     return
             pipeline.save_manual_mask(p, photo, mask)
-            pipeline.analyse(p, os.path.dirname(photo), photo)
+            new = pipeline.analyse(p, os.path.dirname(photo), photo)
         except Exception as e:
-            QMessageBox.warning(self, 'Review', f'Could not redo the outline: {e}')
-        finally:
             QApplication.restoreOverrideCursor()
+            QMessageBox.warning(self, 'Review', ('Could not add to the outline: ' if adding else
+                                                 'Could not redo the outline: ') + str(e))
+            return
+        finally:
+            if QApplication.overrideCursor() is not None:
+                QApplication.restoreOverrideCursor()
+        self.keep = photo                    # stay on this photo to see the new outline, even if it is now fine
         self.show_project(p)
-        for j, it in enumerate(self.items):          # stay on the same photo if it still needs a look
+        self.keep = None
+        for j, it in enumerate(self.items):
             if it['path'] == photo:
                 self.list.setCurrentRow(j)
-                QMessageBox.information(self, 'Review', 'New outline saved. The photo still needs a look for:\n'
-                                        + flags_text(it.get('flags')) + '\n\nIf it is fine, press Accept.')
+        after = new.get('fish_area_px')
+        change = (f' The outline grew by {100 * (after - before) / before:.0f}%.' if adding and before and after
+                  else '')
+        tail = ('The tail fin is now in the outline.' if new.get('caudal_in_mask')
+                else 'The tail fin is still not all in the outline: click on the missing part again, or mark the '
+                     'tail tip on screen 8 (the total length then comes from it).')
+        left = flags_text(new.get('flags')) if new.get('status') == 'to_check' else 'Nothing serious left: press Accept.'
+        QMessageBox.information(self, 'Review', f'New outline saved and the photo measured again.{change}\n{tail}'
+                                f'\n\nStill to check:\n{left}')
 
     def set_analysis(self, mode):
         i = self.list.currentRow()
@@ -908,8 +1005,9 @@ def measures_legend():
              ('peduncle', 'end of the body (caudal peduncle), only when the tail fin is in the outline'),
              ('depth', 'maximum depth')]
     rows = [f'<span style="color:{hexc(k)}; font-weight:700">&#9644;</span> {t}' for k, t in items]
-    rows.append(f'<span style="color:{LANDMARK_COLOUR}; font-weight:700">&#9679;&#9644;</span> landmarks and '
-                'standard length (SL, snout to end of the peduncle)')
+    rows.append(f'<span style="color:{LANDMARK_COLOUR}; font-weight:700">&#9679;&#9644;</span> from the landmarks, '
+                'and then they win over the outline: SL (snout to end of the peduncle), TL (dashed, snout to tail '
+                'tip), end of the body across the peduncle, maximum depth across the body at the gonopodium base')
     return '<br>'.join(rows)
 
 
@@ -932,9 +1030,19 @@ def measures_pixmap(project, r):
         pen = QPen(QColor(LANDMARK_COLOUR))
         pen.setWidthF(max(2.0, pm.width() / 200))
         qp.setPen(pen)
+        lines = [r.get('body_end_line'), r.get('depth_line')]
         if pts.get('snout') and pts.get('peduncle_end'):
-            (ax, ay), (bx, by) = to(pts['snout']), to(pts['peduncle_end'])
+            lines.append([pts['snout'], pts['peduncle_end']])
+        for line in filter(None, lines):
+            (ax, ay), (bx, by) = to(line[0]), to(line[1])
             qp.drawLine(ax, ay, bx, by)
+        if pts.get('snout') and pts.get('tail_tip'):            # TL: dashed, next to the SL line
+            dash = QPen(pen)
+            dash.setStyle(Qt.DashLine)
+            qp.setPen(dash)
+            (ax, ay), (bx, by) = to(pts['snout']), to(pts['tail_tip'])
+            qp.drawLine(ax, ay, bx, by)
+            qp.setPen(pen)
         qp.setBrush(QColor(LANDMARK_COLOUR))
         rr = max(5, pm.width() // 90)
         for p in pts.values():

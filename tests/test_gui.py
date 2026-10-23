@@ -57,9 +57,16 @@ def test_click_in_review_fixes_missing_fish(photos, monkeypatch):
     app.processEvents()
     page = w.pages[3]
     assert len(page.items) == 1
+    from PySide6.QtWidgets import QMessageBox
+    told = []
+    monkeypatch.setattr(QMessageBox, 'information', lambda *a, **k: told.append(a[2]))
     page.show_item(0)
+    assert page.views.tabText(page.views.currentIndex()).endswith('Fish')
     page.click_fish(page.image.width() / 2, page.image.height() / 2)
-    assert p.results()[0]['status'] == 'ok' and page.items == []
+    assert p.results()[0]['status'] == 'ok' and 'New outline saved' in told[0] and 'Accept' in told[0]
+    assert [r['path'] for r in page.items] == [p.results()[0]['path']]      # stays on screen to be seen
+    page.show_project(p)
+    assert page.items == []
 
 
 def test_label_fixed_in_review(photos, monkeypatch):
@@ -87,7 +94,11 @@ def test_label_fixed_in_review(photos, monkeypatch):
     w.nav.setCurrentRow(3)
     app.processEvents()
     page = w.pages[3]
-    assert len(page.items) == 1 and page.lab_box.isVisible() and page.lab_img.pixmap() is not None
+    assert len(page.items) == 1 and page.views.tabText(page.views.currentIndex()) == '\u26a0 Label'
+    assert page.tools.currentIndex() == 1 and not page.image.pixmap().isNull()
+    page.views.setCurrentIndex(0)
+    assert page.issues.text() == 'Nothing to check here.'
+    page.views.setCurrentIndex(1)
     page.lab_id.setText('m117')
     page.save_label()
     assert p.load_result(page.items[0]['path'])['label_id'] == 'M117'

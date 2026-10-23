@@ -89,18 +89,21 @@ analysis at the next Start.
 found on each fish.
 
 ### 4 Review
-Photos with errors or warnings, most uncertain first. **Accept** (Enter) or **Exclude**. If the fish was not
-found or the outline is wrong, click once on the fish and the outline is redone. The label crop is shown
-with the id read; type the right id and **Save id** (it wins over the reading from then on).
+Photos with errors or warnings, most uncertain first. **Accept** (Enter) or **Exclude**. Each photo has three views;
+the ones with a warning sign have something to check, listed in red above the picture, and the screen opens on
+the most important one:
 
-**Transparent fins**: if part of the fish is missing from the outline (often the caudal fin), press **Add to the
-outline** and click on the missing part, close to the fish: that part is joined to the outline (repeat for more
-parts). A click without the button redoes the whole outline.
-
-**Scale**: when the automatic scale is doubtful the whole photo is shown with a red line that should cover 2 cm
-(20 squares). **Confirm scale** if it does; otherwise **Calibrate manually**: zoom in (wheel), click the two ends
-of a known length (2 cm by default, the longer the more precise), type its length in mm, and tick *Use it also for
-the other photos of the folder* when the camera did not move. The scale drawn by hand stays for later analyses.
+- **Fish**: the outline with its measures drawn (legend in 5 Results). Choose what a click on the fish does:
+  *redoes the whole outline* (fish not found, or wrong outline) or *adds the part you click to the outline*
+  (transparent fins, often the caudal fin: click on the missing part, close to the fish; repeat for more parts).
+  After a click the photo stays on screen with the new outline, and a message says how much the outline grew,
+  whether the tail fin is now in it and what is left to check.
+- **Label**: the label close up (the whole photo when it was not found) with the text read; type the right id and
+  **Save id** (it wins over the reading from then on).
+- **Scale**: the whole photo. When the automatic scale is doubtful a red line should cover 2 cm (20 squares).
+  **Confirm scale** if it does; otherwise **Calibrate manually**: zoom in (wheel), click the two ends of a known
+  length (2 cm by default, the longer the more precise), type its length in mm, and tick *Use it also for the
+  other photos of the folder* when the camera did not move. The scale drawn by hand stays for later analyses.
 
 ### 5 Results
 Table of the main measures (SL, TL, mask length, depth, areas) and **Export CSV for R** (`export/measurements.csv`).
@@ -112,7 +115,14 @@ Click a row to see how that fish was measured. The lines are drawn on the photo 
 - cyan: midline, from the snout (green) to the end of the outline (red) = `mask_length_mm`;
 - orange: end of the body at the caudal peduncle, only when the tail fin is in the outline (body area stops there);
 - yellow: maximum depth; white bar: 5 mm, when the scale is known;
-- blue dots and line: the landmarks and the SL, as they are now (they change as soon as you click them on screen 8).
+- blue: the landmarks and what comes from them, as they are now (they change as soon as you click them on screen 8):
+  SL line, TL (dashed, snout to tail tip), the end of the body across the peduncle, the maximum depth across the
+  body at the gonopodium base.
+
+**Landmarks win over the outline.** When the landmarks are there (clicked or predicted): TL = snout to tail tip;
+the body ends at the peduncle landmark (body area before it, caudal fin area after it, when the fin is in the
+outline); the maximum depth is measured across the body at the base of the gonopodium. The `*_source` columns of
+the CSV say where each value came from.
 
 Photos analysed before 0.9.0 show only the outline: run the Analysis again to get the drawing.
 
@@ -201,8 +211,10 @@ colour) and purple (reflection), then **Import strokes from Paint**.
 | `total_length_mm` | TL: the outline length when the whole caudal fin is in it; otherwise snout to tail tip from the landmarks; else `NA` (flag `tail_incomplete`) |
 | `total_length_source` | `outline`, `landmarks` or `NA` |
 | `mask_length_mm` | length of the outline along the fish |
-| `max_depth_mm` | maximum body depth |
-| `fish_area_mm2`, `body_area_mm2` | area of the outline; area without the caudal fin |
+| `caudal_length_mm` | end of the peduncle to tail tip (landmarks) |
+| `max_depth_mm`, `depth_source` | maximum body depth: across the body at the gonopodium base (`landmarks`) or widest point of the outline (`outline`) |
+| `fish_area_mm2`, `body_area_mm2`, `body_area_source` | area of the outline; area without the caudal fin, cut at the peduncle landmark (`landmarks`) or where the outline narrows (`outline`) |
+| `caudal_area_mm2` | outline after the peduncle landmark, only when the tail fin is in the outline |
 | `area_<class>_mm2` | area of each colour class (with a colour model) |
 | `pct_<class>` | % of the fish area (reflections left out) |
 | `n_spots_<class>` | number of separate spots |
