@@ -1,0 +1,9 @@
+file,setup,year,sex,colour_chart,scale,label_style,fish_size_in_frame,exif_orientation,notes
+sample_01.jpg,closeup_block1,2023,male,no,graph_paper_1mm,group_date_male_id,large,1,
+sample_02.jpg,closeup_block2,2023,male,no,graph_paper_1mm,group_date_male_id,large,1,
+sample_03.jpg,closeup_block3,2023,male,no,graph_paper_1mm,group_date_male_id,large,1,darker exposure
+sample_04.jpg,wide_males_block1,2023,male,yes_24,graph_paper,group_male_id,small,8,portrait (rotated 90 degrees)
+sample_05.jpg,wide_males_block2,2023,male,yes_24,graph_paper,group_male_id,small,1,fish vertical in frame
+sample_06.jpg,wide_males_2024,2024,male,yes_24,graph_paper_orange,id_date,small,1,orange graph paper
+sample_07.jpg,offspring_2025,2025,male,yes_24,graph_paper,female_sex_number,small,3,young male in small tank; rotated 180 degrees
+sample_08.jpg,offspring_2025,2025,female,yes_24,graph_paper,female_sex_number,small,3,female (size only); rotated 180 degrees

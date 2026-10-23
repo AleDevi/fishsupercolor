@@ -9,6 +9,10 @@
 - RAW photo support.
 - Verified update from GitHub releases (off while the repository is private).
 
+## Unreleased
+- Tests: `tests/data/samples/` with one real photo per photo setup (8 photos, neutral ids, README and CSV);
+  not included in the release zip.
+
 ## 0.6.0 (2026-10-22)
 - Scale: the automatic graph-paper scale must be measured over at least 20 squares (2 cm), else it is doubtful.
   A 2 cm line along the grid is kept (`scale_line`, `scale_squares` in the results).
