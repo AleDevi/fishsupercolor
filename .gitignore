@@ -17,3 +17,6 @@ venv/
 build/
 dist/
 *.egg-info/
+# sample photos for tests are tracked
+!tests/data/samples/*.jpg
+!tests/data/samples/*.csv
