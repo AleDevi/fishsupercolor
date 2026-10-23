@@ -1,5 +1,5 @@
-"""Main window: one screen per step (Project, Settings, Analysis, Review, Results, Training).
-Pattern and clusters arrives in phase 3 and is shown disabled."""
+"""Main window: one screen per step (Project, Settings, Analysis, Review, Results, Pattern and clusters, Training,
+Landmarks)."""
 import html
 import os
 import sys

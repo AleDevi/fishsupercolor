@@ -5,3 +5,6 @@
 .gitattributes export-ignore
 tests/data/** export-ignore
 *.jpg binary
+tools export-ignore
+AGENTS.md export-ignore
+CLAUDE.md export-ignore
