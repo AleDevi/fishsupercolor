@@ -1,0 +1,37 @@
+name: llm-prompt
+
+# Keeps the generated part of LLM_PROMPT.md in step with the code: pull requests are checked,
+# pushes to main regenerate it and commit the result when something changed.
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: llm-prompt-${{ github.ref }}
+
+jobs:
+  llm-prompt:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Check (pull requests)
+        if: github.event_name == 'pull_request'
+        run: python tools/update_llm_prompt.py --check
+      - name: Regenerate and commit (main)
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+        run: |
+          python tools/update_llm_prompt.py
+          git diff --quiet LLM_PROMPT.md && exit 0
+          git config user.name "github-actions[bot]"
+          git config user.email "41898283+github-actions[bot]@users.noreply.github.com"
+          git commit -m "LLM_PROMPT.md: regenerate the current state" LLM_PROMPT.md
+          git pull --rebase origin main
+          git push origin HEAD:main

@@ -331,6 +331,10 @@ guppycolor run PROJECT           analyse pending photos and write export/measure
 - GitHub Actions: `tests` runs the tests on Windows with Python 3.12 and the locked packages at every push and
   pull request; `release` publishes `GuppyColour_<version>.zip` and its `.sha256` when a tag `v<version>` is
   pushed (the tag must match `guppycolor/__init__.py`). Tag a release only after its security re-check.
+- Working with an AI assistant: paste [`LLM_PROMPT.md`](LLM_PROMPT.md) into the chat first (coding agents load it
+  through `AGENTS.md` / `CLAUDE.md`). Its *Current state* block is generated from the code by
+  `python tools/update_llm_prompt.py`; the `llm-prompt` workflow checks it on pull requests and regenerates it on
+  every push to `main`.
 - Dependencies: edit `requirements.in`, then
   `uv pip compile requirements.in --python-platform windows --python-version 3.12 --generate-hashes -o requirements-win.txt`.
 
