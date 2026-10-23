@@ -1,5 +1,6 @@
 """Main window: one screen per step (Project, Settings, Analysis, Review, Results, Training).
 Pattern and clusters arrives in phase 3 and is shown disabled."""
+import html
 import os
 import sys
 
@@ -781,7 +782,7 @@ class ReviewPage(QWidget):
         r = self.items[i]
         mode = {'size': 'size only', 'size_colour': 'size + colour'}.get(r.get('analysis'), '')
         status = STATUS_LABEL.get(r.get('status'), r.get('status'))
-        self.info.setText(f"<b>{r['file']}</b> ({r['folder']}) · {mode} · {status}")
+        self.info.setText(f"<b>{html.escape(r['file'])}</b> ({html.escape(r['folder'])}) · {mode} · {status}")
         by = self.flags_by_view(r)
         serious = [v for v in VIEWS if any(f in pipeline.SERIOUS or f == 'fish_not_found' for f in by[v])]
         any_flag = [v for v in VIEWS if by[v]]
