@@ -9,6 +9,15 @@
 - RAW photo support.
 - Verified update from GitHub releases (off while the repository is private).
 
+## 0.7.0 (2026-10-23)
+- Training and Landmarks: progress bar while training (photos read, then trees grown; training rounds for
+  landmarks).
+- **Export model… / Import model…**: a trained colour or landmark model as one `.zip` (manifest with the SHA-256
+  of each part) to reuse in another project or share. Import refuses damaged files, unexpected contents, and
+  models whose colour classes or landmarks differ from the project's profile; it is saved as the next version with
+  `imported_from`.
+- Colour forest grown 10 trees at a time (same settings) to report progress.
+
 ## 0.6.1 (2026-10-23)
 - Installer updates an installation it made itself (marker file `venv\guppycolour-installed.txt`) in place (packages
   already installed are not downloaded again; any other venv is replaced),

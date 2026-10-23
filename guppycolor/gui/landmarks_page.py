@@ -8,11 +8,12 @@ from PySide6.QtCore import QObject, QPointF, QRectF, Qt, QThread, Signal
 from PySide6.QtGui import QBrush, QColor, QFont, QKeySequence, QPainter, QPen, QPixmap, QShortcut
 from PySide6.QtWidgets import (
     QComboBox, QFormLayout, QGraphicsEllipseItem, QGraphicsPixmapItem, QGraphicsScene, QGraphicsSimpleTextItem,
-    QGraphicsView, QGroupBox, QHBoxLayout, QLabel, QListWidget, QListWidgetItem, QMessageBox, QPushButton,
-    QSplitter, QVBoxLayout, QWidget,
+    QGraphicsView, QGroupBox, QHBoxLayout, QLabel, QListWidget, QListWidgetItem, QMessageBox, QProgressBar,
+    QPushButton, QSplitter, QVBoxLayout, QWidget,
 )
 
 from .. import landmarks, pipeline, profile, training
+from . import modelfiles
 from .training_page import to_qimage
 
 COLOURS = ['#E53935', '#FDD835', '#43A047', '#1E88E5', '#8E24AA', '#FB8C00', '#00ACC1', '#6D4C41', '#D81B60']
@@ -93,6 +94,7 @@ class ClickView(QGraphicsView):
 class TrainWorker(QObject):
     done = Signal(str, dict)
     failed = Signal(str)
+    progress = Signal(int, int, str)
 
     def __init__(self, project):
         super().__init__()
@@ -100,7 +102,7 @@ class TrainWorker(QObject):
 
     def run(self):
         try:
-            self.done.emit(*landmarks.train(self.project))
+            self.done.emit(*landmarks.train(self.project, progress=self.progress.emit))
         except Exception as e:
             self.failed.emit(f'{type(e).__name__}: {e}')
 
@@ -157,6 +159,20 @@ class LandmarksPage(QWidget):
         self.b_train = QPushButton('Train')
         self.b_train.clicked.connect(self.train)
         ml.addWidget(self.b_train)
+        self.bar = QProgressBar()
+        self.bar.hide()
+        ml.addWidget(self.bar)
+        self.bar_text = QLabel('')
+        self.bar_text.setWordWrap(True)
+        self.bar_text.hide()
+        ml.addWidget(self.bar_text)
+        row = QHBoxLayout()
+        for text, fn in (('Export model…', lambda: modelfiles.export_dialog(self, self.project, self.model.currentData())),
+                         ('Import model…', self.import_model)):
+            b = QPushButton(text)
+            b.clicked.connect(fn)
+            row.addWidget(b)
+        ml.addLayout(row)
         f = QFormLayout()
         self.model = QComboBox()
         self.model.activated.connect(self.use_model)
@@ -284,12 +300,30 @@ class LandmarksPage(QWidget):
         self.thread.started.connect(self.worker.run)
         self.worker.done.connect(self.on_trained)
         self.worker.failed.connect(self.on_failed)
+        self.worker.progress.connect(self.on_progress)
+        self.bar.setValue(0)
+        self.bar.show()
+        self.bar_text.show()
         self.thread.start()
+
+    def on_progress(self, i, n, text):
+        self.bar.setMaximum(max(n, 1))
+        self.bar.setValue(i)
+        self.bar_text.setText(text)
+
+    def import_model(self):
+        name = modelfiles.import_dialog(self, self.project, 'landmarks')
+        if name:
+            self.project.settings['landmarks']['model'] = name
+            self.project.save()
+            self.fill_models()
 
     def _stop(self):
         self.thread.quit()
         self.thread.wait()
         self.thread = None
+        self.bar.hide()
+        self.bar_text.hide()
         self.b_train.setEnabled(True)
         self.b_train.setText('Train')
 

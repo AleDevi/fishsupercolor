@@ -143,6 +143,8 @@ def train(project, epochs=150, imgsz=640, progress=None):
     import hashlib
     prof = profile.load(project.settings['profile'])
     keys = [l['key'] for l in landmark_list(prof)]
+    if progress:
+        progress(0, epochs, 'Preparing the photos')
     yaml, n = build_dataset(project, os.path.join(project.dir('training'), 'landmarks_dataset'), keys)
     if n < 2:
         raise ValueError('Click the landmarks on at least a few photos first (10–30 are a good start).')
@@ -152,7 +154,11 @@ def train(project, epochs=150, imgsz=640, progress=None):
     import torch
     nums = [int(re.findall(r'v(\d+)', m)[-1]) for m, _ in list_models(project)]
     name = f'landmarks_v{max(nums, default=0) + 1}'
-    YOLO(base).train(data=yaml, epochs=epochs, imgsz=imgsz, batch=8, workers=0, fliplr=0.0, mosaic=0.0, amp=False,
+    model = YOLO(base)
+    if progress:
+        model.add_callback('on_train_epoch_end', lambda tr: progress(
+            tr.epoch + 1, epochs, f'Round {tr.epoch + 1} of {epochs} (it may stop earlier when it no longer improves)'))
+    model.train(data=yaml, epochs=epochs, imgsz=imgsz, batch=8, workers=0, fliplr=0.0, mosaic=0.0, amp=False,
                      device=0 if torch.cuda.is_available() else 'cpu', project=project.dir('models'), name=name,
                      exist_ok=True, plots=False, verbose=False, patience=40)
     w = model_weights(project, name)

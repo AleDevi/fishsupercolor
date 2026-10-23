@@ -133,6 +133,14 @@ Landmarks clicked in screen 8 (or placed by the landmark model) are used: the sn
    (`export/validation_<model>.png`) and the pairs (`.csv`). Spots cannot be matched one by one, so the
    comparison is on the totals.
 
+**Where the models are.** In the project folder, `models\colours_v1.npz` + `colours_v1.json` (date, annotator,
+photos, pixels per class); every training adds v2, v3… A bar shows the training progress.
+
+**Export model… / Import model…** save the model chosen in *Use in the analysis* as one `.zip` file, to use it in
+another project or give it to a colleague. Import checks the file (fixed contents, SHA-256 of each part) and that
+its colour classes are those of the project's species profile, then adds it as the next version and puts it in use;
+the model keeps where it came from (`imported_from` in its `.json`).
+
 Strokes made in Windows Paint can be imported: save a copy of the photo as `<photo name>_strokes.png` next
 to it and paint with Paint's orange (carotenoid), green (black), blue (iridescent), yellow (body without
 colour) and purple (reflection), then **Import strokes from Paint**.
@@ -149,6 +157,9 @@ colour) and purple (reflection), then **Import strokes from Paint**.
    from the small public `yolo11n-pose.pt` weights (downloaded once and checked against their SHA-256). A GPU
    takes minutes, a CPU much longer. The new model is put in use; run the **Analysis** again to get SL (and
    the landmarks) on every fish. Landmarks the model is unsure of (confidence < 0.5) are left out.
+   A bar shows the training rounds; it may stop before the last one when the model no longer improves.
+   **Export model… / Import model…** work as in Training (the landmarks must be the same as in the project's
+   profile). Landmark models contain neural-network weights: import only files from people you trust.
 4. Clicked landmarks always win over the model. The CSV column `landmarks_source` says which one was used
    (`manual`, `model`, `NA`).
 
@@ -281,6 +292,7 @@ guppycolor run PROJECT           analyse pending photos and write export/measure
 - `guppycolor/engine/`: stateless algorithms (`colour`, `segment`, `scale`, `morpho`, `labels`, `pixels`).
 - `guppycolor/project.py`, `pipeline.py`, `export.py`: project, analysis of one photo, CSV.
 - `guppycolor/training.py`, `verify.py`: colour-class training and comparison with manual measures.
+- `guppycolor/modelshare.py`: export/import of trained models as `.zip` (manifest with SHA-256).
 - `guppycolor/landmarks.py`: clicked landmarks, standard length, YOLO-pose dataset, training and prediction.
 - `guppycolor/pattern.py`, `engine/pattern.py`: alignment and clustering of the colour patterns.
 - `guppycolor/gui/`: PySide6 window (`main.py`, `training_page.py`, `pattern_page.py`, `landmarks_page.py`).

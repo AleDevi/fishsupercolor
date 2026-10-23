@@ -8,10 +8,12 @@ from PySide6.QtGui import QBrush, QColor, QImage, QKeySequence, QPainter, QPen, 
 from PySide6.QtWidgets import (
     QButtonGroup, QCheckBox, QComboBox, QDialog, QDialogButtonBox, QDoubleSpinBox, QFileDialog, QFormLayout,
     QGraphicsPixmapItem, QGraphicsScene, QGraphicsView, QGroupBox, QHBoxLayout, QLabel, QLineEdit, QListWidget,
-    QListWidgetItem, QMessageBox, QPushButton, QRadioButton, QSlider, QSplitter, QTextEdit, QVBoxLayout, QWidget,
+    QListWidgetItem, QMessageBox, QProgressBar, QPushButton, QRadioButton, QSlider, QSplitter, QTextEdit, QVBoxLayout,
+    QWidget,
 )
 
 from .. import profile, training, verify
+from . import modelfiles
 
 
 def to_qimage(rgb):
@@ -131,6 +133,7 @@ class PaintView(QGraphicsView):
 class TrainWorker(QObject):
     done = Signal(str, dict)
     failed = Signal(str)
+    progress = Signal(int, int, str)
 
     def __init__(self, project):
         super().__init__()
@@ -138,7 +141,7 @@ class TrainWorker(QObject):
 
     def run(self):
         try:
-            name, meta = training.train(self.project)
+            name, meta = training.train(self.project, progress=self.progress.emit)
             self.done.emit(name, meta)
         except Exception as e:
             self.failed.emit(str(e))
@@ -213,6 +216,19 @@ class TrainingPage(QWidget):
         self.b_train = QPushButton('Train')
         self.b_train.clicked.connect(self.train)
         ml.addWidget(self.b_train)
+        self.bar = QProgressBar()
+        self.bar.hide()
+        ml.addWidget(self.bar)
+        self.bar_text = QLabel('')
+        self.bar_text.hide()
+        ml.addWidget(self.bar_text)
+        row = QHBoxLayout()
+        for text, fn in (('Export model…', lambda: modelfiles.export_dialog(self, self.project, self.model.currentData())),
+                         ('Import model…', self.import_model)):
+            b = QPushButton(text)
+            b.clicked.connect(fn)
+            row.addWidget(b)
+        ml.addLayout(row)
         self.model_info = QLabel('')
         self.model_info.setWordWrap(True)
         ml.addWidget(self.model_info)
@@ -408,12 +424,31 @@ class TrainingPage(QWidget):
         self.thread.started.connect(self.worker.run)
         self.worker.done.connect(self.on_trained)
         self.worker.failed.connect(self.on_failed)
+        self.worker.progress.connect(self.on_progress)
+        self.bar.setValue(0)
+        self.bar.show()
+        self.bar_text.show()
         self.thread.start()
+
+    def on_progress(self, i, n, text):
+        self.bar.setMaximum(max(n, 1))
+        self.bar.setValue(i)
+        self.bar_text.setText(text)
+
+    def import_model(self):
+        name = modelfiles.import_dialog(self, self.project, 'colours')
+        if name:
+            self.project.settings['colours']['model'] = name
+            self.project.save()
+            self.fill_models()
+            self.update_prediction()
 
     def _stop_thread(self):
         self.thread.quit()
         self.thread.wait()
         self.thread = None
+        self.bar.hide()
+        self.bar_text.hide()
         self.b_train.setEnabled(True)
         self.b_train.setText('Train')
 

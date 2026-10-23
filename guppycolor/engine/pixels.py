@@ -70,12 +70,23 @@ class Forest:
         self.proba, self.roots, self.classes, self.meta = proba, roots, classes, meta or {}
 
     @classmethod
-    def train(cls, X, y, trees=60, depth=14, seed=0):
+    def train(cls, X, y, trees=60, depth=14, seed=0, progress=None):
+        """progress(trees done, trees) while the forest grows (in steps of 10 trees)."""
         from sklearn.ensemble import RandomForestClassifier
-        rf = RandomForestClassifier(n_estimators=trees, max_depth=depth, min_samples_leaf=3, n_jobs=-1,
-                                    oob_score=len(np.unique(y)) > 1 and len(y) >= 50, random_state=seed,
-                                    class_weight='balanced')
-        rf.fit(X, y)
+        from sklearn.utils.class_weight import compute_class_weight
+        oob = len(np.unique(y)) > 1 and len(y) >= 50
+        cl = np.unique(y)
+        weights = dict(zip(cl.tolist(), compute_class_weight('balanced', classes=cl, y=y)))   # = 'balanced'
+        rf = RandomForestClassifier(n_estimators=0, max_depth=depth, min_samples_leaf=3, n_jobs=-1, warm_start=True,
+                                    random_state=seed, class_weight=weights)
+        for n in range(min(10, trees), trees + 10, 10):
+            n = min(n, trees)
+            rf.set_params(n_estimators=n, oob_score=oob and n == trees)      # held-out accuracy once, at the end
+            rf.fit(X, y)
+            if progress:
+                progress(n, trees)
+            if n == trees:
+                break
         parts, off = [], 0
         for est in rf.estimators_:
             t = est.tree_

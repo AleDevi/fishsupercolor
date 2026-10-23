@@ -148,9 +148,11 @@ def train(project, progress=None):
     prof = profile.load(project.settings['profile'])
     data = annotated(project)
     X, y, used = [], [], []
+    trees = 60
+    total = len(data) + trees                     # progress: one step per photo, then one per tree
     for i, (photo, _) in enumerate(data):
         if progress:
-            progress(i, len(data), os.path.basename(photo))
+            progress(i, total, 'Reading the strokes: ' + os.path.basename(photo))
         mask = fish_mask(project, photo)
         if mask is None:
             continue
@@ -165,7 +167,8 @@ def train(project, progress=None):
     X, y = np.concatenate(X), np.concatenate(y)
     if len(np.unique(y)) < 2:
         raise ValueError('Strokes of at least two different brushes are needed.')
-    forest = pixels.Forest.train(X, y)
+    forest = pixels.Forest.train(X, y, trees=trees, progress=progress and (
+        lambda k, n: progress(len(data) + k, total, f'Growing the forest: {k} of {n} trees')))
     n = len(list_models(project)) and max(int(re.findall(r'v(\d+)', m)[-1]) for m, _ in list_models(project))
     name = f'colours_v{n + 1}'
     b = brushes(prof)
