@@ -25,8 +25,18 @@ for, how it is built, the rules every change must follow, and how to organise th
   - messages in the app are plain, short, non-technical English and say what to do next.
 - **Scope**: one fish per photo, batches of hundreds of photos per experiment, fish anaesthetised and lying on
   their side (head usually on the left), on graph paper, with or without a ColorChecker 24 chart and a written or
-  QR label with the fish id. Everything species-specific lives in a **species profile**, so other species
-  (e.g. zebrafish) can be added later without touching the code.
+  QR label with the fish id.
+- **Not only male guppies.** The app is *optimised* for male guppies, the first use case, but it is and will be
+  designed for other animals: guppy females, other fish species, and possibly other animals. Photo sets may
+  already mix males, females and other species. So:
+  - everything specific to a species or sex (body parts, colour classes, landmarks, expected shapes, label
+    formats) lives in a **profile** (`guppycolor/profiles/*.json`), never in the code;
+  - no guppy-only or male-only assumption may be hard-coded (e.g. a gonopodium, three colour classes, a fixed
+    length/depth ratio, the head on the left): read it from the profile or the settings, with the guppy male as
+    the default;
+  - when a feature only makes sense for some animals, make it optional and say in the profile when it applies;
+  - name things generically in code, CSV columns and UI (`fish`, `animal`, `colour class`, `landmark`), keeping
+    the guppy names only as profile values.
 
 ## 2. Scientific context
 
@@ -168,7 +178,10 @@ for, how it is built, the rules every change must follow, and how to organise th
      `~/.guppycolor`; no administrator rights.
 8. **Style**: match the surrounding code (short docstrings that say what and why, few comments, plain functions).
    Every module starts with a docstring: its first line is copied into this file's module table.
-9. **This file**: update the hand-written sections when you change the goal, architecture, rules or way of
+9. **Generic by design**: a change must work for any profile, not only the guppy male (section 1, *Not only
+   male guppies*). If it needs a new species- or sex-specific value, add it to the profile with the current
+   guppy value as the default, and add a test with a profile that lacks it.
+10. **This file**: update the hand-written sections when you change the goal, architecture, rules or way of
    working, and run `python tools/update_llm_prompt.py` (see below).
 
 ## 5. Build, test, release
@@ -226,5 +239,5 @@ Long chats lose track. Split the work like this:
   Never edit it by hand: run `python tools/update_llm_prompt.py`.
 - GitHub Actions (`.github/workflows/llm-prompt.yml`) checks it on every pull request and, after every push to
   `main`, regenerates it and commits the result if anything changed.
-- The hand-written sections are updated with the change that makes them wrong (rule 9 above). When you finish a
+- The hand-written sections are updated with the change that makes them wrong (rule 10 above). When you finish a
   task, re-read sections 1–7 and propose edits if anything no longer holds.
