@@ -96,6 +96,10 @@ for, how it is built, the rules every change must follow, and how to organise th
 
 #### Planned (CHANGELOG)
 
+- General scope (Ale, 2026-10-23): tuned for male guppies, built for any fish, both sexes and later other
+  animals. Next: animal groups in one project (e.g. male / female, or species), each with its own profile and
+  landmarks, assigned by folder, file name or per photo; a female guppy profile (anal fin base instead of the
+  gonopodium for body depth); a generic fish profile.
 - Python 3.13: make rapidocr-onnxruntime optional (no 3.13 release; install fails), installer should `venv --clear`.
 - Fish detector: YOLOE finds no fish on 36/50 white-background photos (Dick 2012-13, datasets/test-100-2026-10-22): add a fallback (background threshold + SAM) or train the detector.
 - Body-part model with its annotation screen.
