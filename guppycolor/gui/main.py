@@ -9,8 +9,8 @@ from PySide6.QtGui import QColor, QDesktopServices, QIcon, QImageReader, QPainte
 from PySide6.QtWidgets import (
     QApplication, QButtonGroup, QCheckBox, QDoubleSpinBox, QFileDialog, QFormLayout, QGroupBox, QHBoxLayout,
     QHeaderView, QInputDialog, QLabel, QLineEdit, QListWidget, QListWidgetItem, QMainWindow, QMessageBox,
-    QProgressBar, QPushButton, QRadioButton, QSplitter, QStackedWidget, QTableWidget, QTableWidgetItem,
-    QVBoxLayout, QWidget,
+    QFrame, QProgressBar, QPushButton, QRadioButton, QScrollArea, QSplitter, QStackedWidget, QTableWidget,
+    QTableWidgetItem, QVBoxLayout, QWidget,
 )
 
 from .. import __version__, export, metadata, pipeline, profile, scaleline
@@ -963,7 +963,11 @@ class MainWindow(QMainWindow):
                 it.setFlags(Qt.NoItemFlags)
                 it.setToolTip('Coming in phase 3')
                 page = QWidget()
-            self.stack.addWidget(page)
+            scroll = QScrollArea()                   # small windows scroll instead of squashing the screen
+            scroll.setWidgetResizable(True)
+            scroll.setFrameShape(QFrame.NoFrame)
+            scroll.setWidget(page)
+            self.stack.addWidget(scroll)
         self.nav.currentRowChanged.connect(self.go)
         self.pages[0].opened.connect(self.set_project)
         self.pages[2].done.connect(lambda: self.pages[3].show_project(self.project))

@@ -10,6 +10,10 @@
 - Verified update from GitHub releases (off while the repository is private).
 - Landmark model export as plain tensors (safetensors/npz) rebuilt locally on import, so a shared file never goes through an unpickler (security review suggestion).
 
+## 0.8.1 (2026-10-23)
+- Every screen scrolls when the window is too small for it, instead of cutting the bottom or squashing the
+  texts on top of each other.
+
 ## 0.8.0 (2026-10-23)
 - Review: **Add to the outline**: the next click joins the part clicked (e.g. a transparent caudal fin) to the
   outline instead of redoing it (SAM prompted with the click and a point inside the fish; only pieces touching
