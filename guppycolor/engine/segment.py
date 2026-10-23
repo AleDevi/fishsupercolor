@@ -68,6 +68,21 @@ def configure_ultralytics(folder=W):
     ultralytics_env(folder)
     from ultralytics import settings
     settings.update({'sync': False, 'weights_dir': folder})   # no analytics events; weights only from `folder`
+    local_fonts()
+
+
+def local_fonts():
+    """Training checks for Arial.ttf and downloads it when missing (it does not see Windows' arial.ttf), which
+    fails offline. The font only labels plots: matplotlib's own DejaVuSans is put in its place, no download."""
+    import shutil
+    import matplotlib
+    from ultralytics.utils import USER_CONFIG_DIR
+    src = os.path.join(matplotlib.get_data_path(), 'fonts', 'ttf', 'DejaVuSans.ttf')
+    for name in ('Arial.ttf', 'Arial.Unicode.ttf'):
+        dest = os.path.join(USER_CONFIG_DIR, name)
+        if not os.path.exists(dest) and os.path.exists(src):
+            os.makedirs(USER_CONFIG_DIR, exist_ok=True)
+            shutil.copyfile(src, dest)
 
 
 _det = None; _sam = None

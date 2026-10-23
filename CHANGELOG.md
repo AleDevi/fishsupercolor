@@ -8,6 +8,12 @@
 - Scale from a ruler in the photo (not only graph paper).
 - RAW photo support.
 - Verified update from GitHub releases (off while the repository is private).
+- Landmark model export as plain tensors (safetensors/npz) rebuilt locally on import, so a shared file never goes through an unpickler (security review suggestion).
+
+## 0.7.1 (2026-10-23)
+- Landmark training failed on Windows ("Download failure … Arial.ttf, environment may be offline"): ultralytics
+  does not see Windows' `arial.ttf` and tries to download one. matplotlib's DejaVuSans is now put in its place
+  in the ultralytics settings folder, so nothing is downloaded.
 
 ## 0.7.0 (2026-10-23)
 - Training and Landmarks: progress bar while training (photos read, then trees grown; training rounds for

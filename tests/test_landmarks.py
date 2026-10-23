@@ -145,3 +145,12 @@ def test_calibrate_dialog(photos):
     assert (a, b, mm, whole) == ((100, 500), (500, 500), 20, False)
     d.click(10, 10)
     assert len(d.points) == 1
+
+
+def test_training_fonts_are_local(tmp_path, monkeypatch):
+    """Training wants Arial.ttf; on Windows ultralytics does not see arial.ttf and tries to download it."""
+    import ultralytics.utils
+    from guppycolor.engine import segment
+    monkeypatch.setattr(ultralytics.utils, 'USER_CONFIG_DIR', tmp_path)
+    segment.local_fonts()
+    assert (tmp_path / 'Arial.ttf').stat().st_size > 100_000 and (tmp_path / 'Arial.Unicode.ttf').exists()
