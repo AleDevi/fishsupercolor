@@ -14,10 +14,10 @@ for, how it is built, the rules every change must follow, and how to organise th
 
 ## 1. Goal and users
 
-- **Goal**: measure the colour pattern of male guppies (*Poecilia reticulata*) automatically and reproducibly
+- **Goal**: measure the morphology and colouration of fish, automatically and reproducibly
   from photos, replacing slow and subjective hand measurement in ImageJ: size (SL, TL, depth, areas), the area
   and number of spots of each colour class, and the spatial pattern (to compare individuals and find groups of
-  similar liveries).
+  similar liveries). The tool is optimized for measuring colour pattern of male guppies (*Poecilia reticulata*). 
 - **Users**: behavioural ecologists and evolutionary biologists. They use **R/RStudio**, often do **not** know
   Python, and work on Windows PCs (some lab PCs have an NVIDIA GPU, most do not). So:
   - everything happens in a **GUI**; installation is **one double-click** (`install_windows.bat`), no terminal;
