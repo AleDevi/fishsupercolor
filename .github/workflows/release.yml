@@ -1,0 +1,30 @@
+name: release
+
+# Push a tag like v0.6.0 (after the security re-check) to publish GuppyColour_0.6.0.zip and its SHA-256.
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build the zip
+        run: |
+          ver="${GITHUB_REF_NAME#v}"
+          grep -q "__version__ = '$ver'" guppycolor/__init__.py || { echo "tag $GITHUB_REF_NAME differs from guppycolor/__init__.py"; exit 1; }
+          git archive --format=zip --prefix=GuppyColour/ -o "GuppyColour_$ver.zip" HEAD
+          sha256sum "GuppyColour_$ver.zip" > "GuppyColour_$ver.zip.sha256"
+          awk -v v="## $ver " 'index($0, v) == 1 {on = 1; next} /^## / {on = 0} on' CHANGELOG.md > notes.md
+          cat "GuppyColour_$ver.zip.sha256" >> notes.md
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          ver="${GITHUB_REF_NAME#v}"
+          gh release create "$GITHUB_REF_NAME" "GuppyColour_$ver.zip" "GuppyColour_$ver.zip.sha256" \
+            --title "Guppy Colour $ver" --notes-file notes.md

@@ -1,0 +1,992 @@
+"""Main window: one screen per step (Project, Settings, Analysis, Review, Results, Training).
+Pattern and clusters arrives in phase 3 and is shown disabled."""
+import os
+import sys
+
+import numpy as np
+from PySide6.QtCore import QObject, QSettings, Qt, QThread, QUrl, Signal
+from PySide6.QtGui import QColor, QDesktopServices, QIcon, QImageReader, QPainter, QPen, QPixmap
+from PySide6.QtWidgets import (
+    QApplication, QButtonGroup, QCheckBox, QDoubleSpinBox, QFileDialog, QFormLayout, QGroupBox, QHBoxLayout,
+    QHeaderView, QInputDialog, QLabel, QLineEdit, QListWidget, QListWidgetItem, QMainWindow, QMessageBox,
+    QProgressBar, QPushButton, QRadioButton, QSplitter, QStackedWidget, QTableWidget, QTableWidgetItem,
+    QVBoxLayout, QWidget,
+)
+
+from .. import __version__, export, metadata, pipeline, profile, scaleline
+from ..project import PROJECT_FILE, Project
+
+STATUS_COLOUR = {'ok': '#2E7D32', 'to_check': '#9A5C00', 'error': '#C62828',
+                 'reviewed': '#1F6FB2', 'excluded': '#5B636E'}
+STATUS_LABEL = {'ok': 'ok', 'to_check': 'to check', 'error': 'error',
+                'reviewed': 'reviewed', 'excluded': 'excluded'}
+FLAG_LABEL = {
+    'no_chart': 'no colour chart found: photo not corrected',
+    'reference_missing': 'the colour reference photo is missing',
+    'scale_doubtful': 'doubtful scale on the graph paper',
+    'scale_not_found': 'scale not found',
+    'scale_from_median': 'scale taken from the session median',
+    'scale_to_set': 'no scale yet: Calibrate manually (draw 2 cm on the photo)',
+    'fish_at_border': 'the fish touches the photo border',
+    'mask_in_pieces': 'the outline is broken into pieces',
+    'unusual_shape': 'unusual outline shape (length/depth ratio)',
+    'fish_not_found': 'fish not found',
+    'area_outlier': 'area very different from the other fish of the session',
+    'label_uncertain': 'label read with low confidence: check the id',
+    'colours_uncertain': 'the colour model is unsure on this fish: a good photo to paint in Training',
+    'tail_incomplete': 'caudal fin not all in the outline: no total length',
+    'date_mismatch': 'the date on the label differs from the date the photo was taken',
+    'overexposed': 'more than 1% of the fish is burnt out (white)',
+    'blurry': 'much less sharp than the other photos of the session',
+    'sl_landmarks_missing': 'snout or end of the caudal peduncle not marked: no standard length',
+    'landmark_model_error': 'the landmark model could not be used (file changed or missing)',
+}
+
+
+def h1(text):
+    lab = QLabel(text)
+    lab.setStyleSheet('font-size: 20px; font-weight: 600; margin-bottom: 8px')
+    return lab
+
+
+def note(text):
+    lab = QLabel(text)
+    lab.setWordWrap(True)
+    lab.setStyleSheet('color: #4F5761')
+    return lab
+
+
+def flags_text(avvisi):
+    return '\n'.join('• ' + FLAG_LABEL.get(f, f) for f in (avvisi or '').split(';') if f) or 'no warnings'
+
+
+# ---------------------------------------------------------------- screens
+class ProjectPage(QWidget):
+    opened = Signal(object)
+
+    def __init__(self, win):
+        super().__init__()
+        self.win = win
+        lay = QVBoxLayout(self)
+        lay.addWidget(h1('1  Project'))
+        lay.addWidget(note('A project is one experiment: it holds the settings, the results and the exported files. '
+                           'You can add photo folders (sessions) at any time.'))
+        row = QHBoxLayout()
+        b_new, b_open = QPushButton('New project…'), QPushButton('Open project…')
+        b_new.clicked.connect(self.new)
+        b_open.clicked.connect(self.open_dialog)
+        row.addWidget(b_new)
+        row.addWidget(b_open)
+        row.addStretch()
+        lay.addLayout(row)
+        self.recent = QListWidget()
+        self.recent.itemDoubleClicked.connect(lambda it: self.open(it.data(Qt.UserRole)))
+        lay.addWidget(QLabel('Recent projects (double-click to open)'))
+        lay.addWidget(self.recent, 1)
+        self.box = QGroupBox('Photo folders of the project')
+        bl = QVBoxLayout(self.box)
+        self.folders = QListWidget()
+        bl.addWidget(self.folders)
+        row = QHBoxLayout()
+        b_add = QPushButton('Add folder…')
+        b_add.clicked.connect(self.add_folder)
+        b_size = QPushButton('Size only / size + colour for the selected folder')
+        b_size.clicked.connect(self.toggle_size_only)
+        row.addWidget(b_add)
+        row.addWidget(b_size)
+        row.addStretch()
+        bl.addLayout(row)
+        self.count = note('')
+        bl.addWidget(self.count)
+        self.box.setEnabled(False)
+        lay.addWidget(self.box, 2)
+        self.load_recent()
+
+    def load_recent(self):
+        self.recent.clear()
+        for p in QSettings('GuppyColour', 'app').value('recent', [], list) or []:
+            if os.path.exists(os.path.join(p, PROJECT_FILE)):
+                it = QListWidgetItem(p)
+                it.setData(Qt.UserRole, p)
+                self.recent.addItem(it)
+
+    def remember(self, path):
+        s = QSettings('GuppyColour', 'app')
+        rec = [p for p in (s.value('recent', [], list) or []) if p != path]
+        s.setValue('recent', [path] + rec[:9])
+        self.load_recent()
+
+    def new(self):
+        d = QFileDialog.getExistingDirectory(self, 'Folder for the new project (empty)')
+        if not d:
+            return
+        if os.path.exists(os.path.join(d, PROJECT_FILE)):
+            if QMessageBox.question(self, 'New project', 'This folder already holds a project. Open it?') \
+                    == QMessageBox.Yes:
+                self.open(d)
+            return
+        name, ok = QInputDialog.getText(self, 'New project', 'Experiment name:',
+                                        text=os.path.basename(d))
+        if not ok or not name:
+            return
+        self.open(Project.create(d, name).path)
+        self.add_folder()
+
+    def open_dialog(self):
+        d = QFileDialog.getExistingDirectory(self, 'Project folder')
+        if d:
+            self.open(d)
+
+    def open(self, path):
+        if not os.path.exists(os.path.join(path, PROJECT_FILE)):
+            QMessageBox.warning(self, 'Project', 'There is no project in this folder.')
+            return
+        p = Project(path)
+        self.remember(p.path)
+        self.opened.emit(p)
+
+    def show_project(self, p):
+        self.box.setEnabled(True)
+        self.box.setTitle(f'Photo folders of project “{p.name}”')
+        self.folders.clear()
+        size_only = {os.path.abspath(f) for f in p.settings['analysis'].get('size_only_folders', [])}
+        for f in p.folders:
+            text = f if os.path.isdir(f) else f + '   (not found)'
+            self.folders.addItem(text + ('   [size only]' if os.path.abspath(f) in size_only else ''))
+        n, todo = len(p.photos()), len(p.pending())
+        self.count.setText(f'{n} photos in total, {todo} to analyse.')
+
+    def toggle_size_only(self):
+        p, i = self.win.project, self.folders.currentRow()
+        if p is None or not 0 <= i < len(p.folders):
+            return
+        f = os.path.abspath(p.folders[i])
+        lst = [os.path.abspath(x) for x in p.settings['analysis'].get('size_only_folders', [])]
+        p.settings['analysis']['size_only_folders'] = [x for x in lst if x != f] if f in lst else lst + [f]
+        p.save()
+        self.show_project(p)
+
+    def add_folder(self):
+        p = self.win.project
+        if p is None:
+            return
+        d = QFileDialog.getExistingDirectory(self, 'Photo folder to add')
+        if d:
+            p.add_folder(d)
+            self.show_project(p)
+
+
+class SettingsPage(QWidget):
+    def __init__(self, win):
+        super().__init__()
+        self.win = win
+        self.loading = False
+        lay = QVBoxLayout(self)
+        lay.addWidget(h1('2  Settings'))
+        lay.addWidget(note('Changes are saved automatically. If you change a setting after an analysis, '
+                           'the photos are analysed again at the next Start.'))
+        # colour
+        g = QGroupBox('Colour correction')
+        gl = QVBoxLayout(g)
+        self.col = QButtonGroup(self)
+        for i, (key, text) in enumerate((
+                ('none', 'None'),
+                ('nominal', 'Nominal values of the colour chart (in every photo)'),
+                ('reference', 'Reference photo: every chart is aligned to the chart of the chosen photo'),
+                ('shared', 'Single calibration: the transform of the reference photo is applied to all photos '
+                           '(also photos without a chart)'))):
+            b = QRadioButton(text)
+            b.setProperty('key', key)
+            self.col.addButton(b, i)
+            gl.addWidget(b)
+        self.col.buttonClicked.connect(self.changed)
+        row = QHBoxLayout()
+        self.ref_label = QLabel()
+        b_ref = QPushButton('Choose the reference photo…')
+        b_ref.clicked.connect(self.pick_reference)
+        b_csv = QPushButton('Import CSV from the ImageJ plugin…')
+        b_csv.clicked.connect(self.import_reference)
+        row.addWidget(b_ref)
+        row.addWidget(b_csv)
+        row.addStretch()
+        gl.addLayout(row)
+        gl.addWidget(self.ref_label)
+        gl.addWidget(note('Photos without a colour chart are measured uncorrected and flagged in the CSV.'))
+        lay.addWidget(g)
+        # scale
+        g = QGroupBox('Scale')
+        gl = QVBoxLayout(g)
+        self.sc = QButtonGroup(self)
+        for i, (key, text) in enumerate((('auto', 'Automatic from the graph paper (smallest square = 1 mm, measured '
+                                                  'over at least 20 squares); doubtful ones are shown in Review'),
+                                         ('manual', 'By hand: in Review draw a known length (e.g. 2 cm) on a photo, '
+                                                    'for that photo or its whole folder'),
+                                         ('fixed', 'Fixed value'), ('none', 'None: measures in pixels'))):
+            b = QRadioButton(text)
+            b.setProperty('key', key)
+            self.sc.addButton(b, i)
+            gl.addWidget(b)
+        self.sc.buttonClicked.connect(self.changed)
+        self.ppm = QDoubleSpinBox()
+        self.ppm.setRange(0, 10000)
+        self.ppm.setDecimals(3)
+        self.ppm.setSuffix(' px/mm')
+        self.ppm.valueChanged.connect(self.changed)
+        row = QHBoxLayout()
+        row.addWidget(self.ppm)
+        b = QPushButton('Measure on a photo…')
+        b.setToolTip('Draw a known length on one photo: its px/mm becomes the fixed value for the project')
+        b.clicked.connect(self.measure_scale)
+        row.addWidget(b)
+        row.addStretch()
+        gl.addLayout(row)
+        lay.addWidget(g)
+        g = QGroupBox('Head of the fish in the photos')
+        gl = QHBoxLayout(g)
+        self.head = QButtonGroup(self)
+        for i, (key, text) in enumerate((('left', 'Left'), ('right', 'Right'), ('auto', 'Guess in each photo'))):
+            b = QRadioButton(text)
+            b.setProperty('key', key)
+            self.head.addButton(b, i)
+            gl.addWidget(b)
+        gl.addStretch()
+        self.head.buttonClicked.connect(self.changed)
+        lay.addWidget(g)
+        # parts
+        g = QGroupBox('Body parts included in the measures')
+        gl = QVBoxLayout(g)
+        self.parts = {}
+        gl.addWidget(note('Body: always included. Separating the parts comes with the trained model (phase 2); '
+                          'for now the choice is recorded in the CSV.'))
+        for part in profile.load('guppy_male')['parts']:
+            if part['optional']:
+                c = QCheckBox(part['label'])
+                c.toggled.connect(self.changed)
+                self.parts[part['key']] = c
+                gl.addWidget(c)
+        lay.addWidget(g)
+        # file names
+        g = QGroupBox('File names')
+        gl = QFormLayout(g)
+        self.pattern = QLineEdit()
+        self.pattern.setPlaceholderText('e.g. {id}_{tank}_{date}')
+        self.pattern.textChanged.connect(self.changed)
+        self.example = note('')
+        gl.addRow('Pattern', self.pattern)
+        gl.addRow('', self.example)
+        lay.addWidget(g)
+        # labels written in the photo
+        g = QGroupBox('Fish ID')
+        gl = QFormLayout(g)
+        self.id_src = QButtonGroup(self)
+        for i, (key, text) in enumerate((
+                ('none', 'No id'),
+                ('label', 'From the label in the photo (QR code or written text)'),
+                ('filename', 'From the file name: the {id} part of the pattern above'),
+                ('table', 'From a data table (photo name → id); the other photos of the folder take the id '
+                          'of their neighbours in shooting order, checked against the label'))):
+            b = QRadioButton(text)
+            b.setProperty('key', key)
+            self.id_src.addButton(b, i)
+            gl.addRow(b)
+        self.id_src.buttonClicked.connect(self.changed)
+        self.read_label = QCheckBox('Also read the label in the photo for its date and group')
+        self.read_label.toggled.connect(self.changed)
+        gl.addRow(self.read_label)
+        self.lab_fields = {}
+        for key, text in (('male_id', 'Id format'), ('group', 'Group format'), ('date', 'Date format')):
+            e = QLineEdit()
+            e.textChanged.connect(self.changed)
+            self.lab_fields[key] = e
+            gl.addRow(text, e)
+        row = QHBoxLayout()
+        self.ids_label = QLabel()
+        b_ids = QPushButton('List of valid ids (Excel or CSV)…')
+        b_ids.clicked.connect(self.pick_ids)
+        row.addWidget(b_ids)
+        row.addWidget(self.ids_label, 1)
+        gl.addRow(row)
+        row = QHBoxLayout()
+        self.table_label = QLabel()
+        b_tab = QPushButton('Data table: photo → id (Excel or CSV)…')
+        b_tab.setToolTip('A sheet with the fish id and the name of its photo (e.g. SL_pictureID), for "From a data table".')
+        b_tab.clicked.connect(self.pick_table)
+        row.addWidget(b_tab)
+        row.addWidget(self.table_label, 1)
+        gl.addRow(row)
+        b_print = QPushButton('Print labels with QR code…')
+        b_print.clicked.connect(self.print_labels)
+        gl.addRow(b_print)
+        gl.addRow(note('Formats are regular expressions: M\\d{3} = M followed by 3 digits. '
+                       'With the list of valid ids, misread labels are corrected. EXIF data (date taken, camera, '
+                       'exposure, ISO, focal length) always go in the CSV.'))
+        lay.addWidget(g)
+        # what to measure
+        g = QGroupBox('What to measure')
+        gl = QFormLayout(g)
+        self.an_default = QButtonGroup(self)
+        for i, (key, text) in enumerate((('size_colour', 'Size and colour on every fish'),
+                                         ('size', 'Size only on every fish'))):
+            b = QRadioButton(text)
+            b.setProperty('key', key)
+            self.an_default.addButton(b, i)
+            gl.addRow(b)
+        self.an_default.buttonClicked.connect(self.changed)
+        self.size_only = QLineEdit()
+        self.size_only.setPlaceholderText(r'e.g. _F\d+$ for F100_F1')
+        self.size_only.textChanged.connect(self.changed)
+        gl.addRow('Size only when the id or file name matches', self.size_only)
+        gl.addRow(note('Folders can be set to size only in Project, single photos in Review '
+                       '(e.g. females, where colour is not measured).'))
+        lay.addWidget(g)
+        lay.addStretch()
+
+    def show_project(self, p):
+        self.loading = True
+        st = p.settings
+        for b in self.col.buttons():
+            b.setChecked(b.property('key') == st['colour']['mode'])
+        for b in self.sc.buttons():
+            b.setChecked(b.property('key') == st['scale']['mode'])
+        self.ppm.setValue(float(st['scale'].get('px_per_mm') or 0))
+        for b in self.head.buttons():
+            b.setChecked(b.property('key') == st.get('head', 'left'))
+        for k, c in self.parts.items():
+            c.setChecked(bool(st['parts'].get(k)))
+        self.pattern.setText(st.get('filename_pattern', ''))
+        for b in self.id_src.buttons():
+            b.setChecked(b.property('key') == st['labels'].get('id_source', 'none'))
+        self.read_label.setChecked(bool(st['labels'].get('read_label')))
+        for b in self.an_default.buttons():
+            b.setChecked(b.property('key') == st['analysis'].get('default', 'size_colour'))
+        self.size_only.setText(st['analysis'].get('size_only_pattern', ''))
+        for k, e in self.lab_fields.items():
+            e.setText(st['labels'].get(k, ''))
+        self.loading = False
+        self.refresh_labels()
+
+    def refresh_labels(self):
+        p = self.win.project
+        ref = p.settings['colour'].get('reference_photo')
+        has = os.path.exists(p.reference_csv)
+        self.ref_label.setText(('Reference: ' + (os.path.basename(ref) if ref else 'imported CSV')) if has
+                               else 'No reference photo chosen.')
+        self.ppm.setEnabled(p.settings['scale']['mode'] == 'fixed')
+        lb = p.settings['labels']
+        for e in self.lab_fields.values():
+            e.setEnabled(pipeline.reads_label(p.settings))
+        self.read_label.setEnabled(lb.get('id_source') in ('none', 'filename'))
+        ids = pipeline.load_expected_ids(lb.get('expected_ids_file'), lb.get('male_id') or '.+')
+        self.ids_label.setText(f"{os.path.basename(lb['expected_ids_file'])}: {len(ids or [])} ids found"
+                               if lb.get('expected_ids_file') else 'no list (optional)')
+        self.table_label.setText(os.path.basename(lb['id_table_file']) if lb.get('id_table_file')
+                                 else 'no table')
+        photos = p.photos()
+        if photos and self.pattern.text():
+            f = os.path.basename(photos[0][1])
+            fields = metadata.parse_filename(f, self.pattern.text())
+            ok = any(fields.values())
+            self.example.setText(f + '  →  ' + (', '.join(f'{k} = {v}' for k, v in fields.items()) if ok
+                                                 else 'the pattern does not match this name'))
+        else:
+            self.example.setText('The parts in braces become CSV columns. Name one {id} to use it as the fish id.')
+
+    def measure_scale(self):
+        folders = self.win.project.folders if self.win.project else []
+        path, _ = QFileDialog.getOpenFileName(self, 'Photo with a ruler or graph paper', folders[0] if folders else '',
+                                              'Photos (*.jpg *.jpeg *.png *.tif *.tiff)')
+        if not path:
+            return
+        from .calibrate import CalibrateDialog
+        d = CalibrateDialog(self, path)
+        if d.exec():
+            (ax, ay), (bx, by), mm, _ = d.result_line()
+            ppm = ((bx - ax) ** 2 + (by - ay) ** 2) ** 0.5 / mm
+            for b in self.sc.buttons():
+                b.setChecked(b.property('key') == 'fixed')
+            self.ppm.setValue(ppm)
+            self.changed()
+
+    def changed(self, *_):
+        if self.loading or self.win.project is None:
+            return
+        p = self.win.project
+        st = p.settings
+        st['colour']['mode'] = self.col.checkedButton().property('key') if self.col.checkedButton() else 'none'
+        st['scale']['mode'] = self.sc.checkedButton().property('key') if self.sc.checkedButton() else 'auto'
+        st['scale']['px_per_mm'] = self.ppm.value() or None
+        st['head'] = self.head.checkedButton().property('key') if self.head.checkedButton() else 'left'
+        st['parts'] = {k: c.isChecked() for k, c in self.parts.items()}
+        st['filename_pattern'] = self.pattern.text().strip()
+        st['labels']['id_source'] = self.id_src.checkedButton().property('key') if self.id_src.checkedButton() else 'none'
+        st['labels']['read_label'] = self.read_label.isChecked()
+        st['analysis']['default'] = (self.an_default.checkedButton().property('key') if self.an_default.checkedButton()
+                                     else 'size_colour')
+        st['analysis']['size_only_pattern'] = self.size_only.text().strip()
+        for k, e in self.lab_fields.items():
+            st['labels'][k] = e.text().strip()
+        p.save()
+        self.refresh_labels()
+
+    def print_labels(self):
+        """Label sheet (QR + id) from the fish list, to put one label next to each fish in the photo."""
+        from .. import labelsheet
+        p = self.win.project
+        lb = p.settings['labels']
+        src, _ = QFileDialog.getOpenFileName(self, 'Fish list', lb.get('expected_ids_file') or '',
+                                             'Excel or text (*.xlsx *.xlsm *.csv *.txt)')
+        if not src:
+            return
+        id_col, ok = QInputDialog.getText(self, 'Labels', 'Name of the id column (empty = look for ids anywhere):')
+        if not ok:
+            return
+        group_col, ok = QInputDialog.getText(self, 'Labels', 'Name of the group column (optional):')
+        if not ok:
+            return
+        date, ok = QInputDialog.getText(self, 'Labels', 'Date to print, e.g. 20/03 (optional):')
+        if not ok:
+            return
+        try:
+            rows = labelsheet.read_rows(src, id_col=id_col.strip() or None, group_col=group_col.strip() or None,
+                                        date=date.strip() or None)
+        except Exception as e:
+            QMessageBox.warning(self, 'Labels', f'Cannot read the list: {e}')
+            return
+        if not rows:
+            QMessageBox.warning(self, 'Labels', 'No ids (e.g. M116) found in the list.')
+            return
+        out, _ = QFileDialog.getSaveFileName(self, 'Save the PDF', os.path.join(p.path, 'labels.pdf'), 'PDF (*.pdf)')
+        if not out:
+            return
+        pages = labelsheet.make_sheet(rows, out)
+        QMessageBox.information(self, 'Labels', f'{len(rows)} labels on {pages} A4 pages: {out}\n'
+                                'Print at 100% (no fit to page) to get the right size.')
+        QDesktopServices.openUrl(QUrl.fromLocalFile(out))
+
+    def pick_ids(self):
+        p = self.win.project
+        f, _ = QFileDialog.getOpenFileName(self, 'List of valid ids', '', 'Excel or text (*.xlsx *.xlsm *.csv *.txt)')
+        if f:
+            p.settings['labels']['expected_ids_file'] = f
+            p.save()
+            self.refresh_labels()
+
+    def pick_table(self):
+        p = self.win.project
+        f, _ = QFileDialog.getOpenFileName(self, 'Data table with fish id and photo name', '',
+                                           'Excel or CSV (*.xlsx *.xlsm *.csv)')
+        if f:
+            p.settings['labels']['id_table_file'] = f
+            p.save()
+            self.refresh_labels()
+
+    def pick_reference(self):
+        p = self.win.project
+        start = p.folders[0] if p.folders else ''
+        f, _ = QFileDialog.getOpenFileName(self, 'Reference photo', start, 'Images (*.jpg *.jpeg *.png *.tif *.tiff)')
+        if not f:
+            return
+        QApplication.setOverrideCursor(Qt.WaitCursor)
+        try:
+            ok = pipeline.set_reference_photo(p, f)
+        finally:
+            QApplication.restoreOverrideCursor()
+        if not ok:
+            QMessageBox.warning(self, 'Reference', 'No complete colour chart found in this photo.')
+        self.refresh_labels()
+
+    def import_reference(self):
+        p = self.win.project
+        f, _ = QFileDialog.getOpenFileName(self, 'Reference CSV (Patch,Name,R,G,B)', '', 'CSV (*.csv)')
+        if not f:
+            return
+        import shutil
+        shutil.copyfile(f, p.reference_csv)
+        if pipeline.load_reference(p.reference_csv) is None:
+            os.remove(p.reference_csv)
+            QMessageBox.warning(self, 'Reference', 'The CSV must have 24 rows with columns Patch,Name,R,G,B.')
+        else:
+            p.settings['colour']['reference_photo'] = ''
+            p.save()
+        self.refresh_labels()
+
+
+class Worker(QObject):
+    progress = Signal(int, int, dict)
+    finished = Signal(int)
+    failed = Signal(str)
+
+    def __init__(self, project):
+        super().__init__()
+        self.project = project
+        self.stop = False
+
+    def run(self):
+        try:
+            n = pipeline.run(self.project, progress=lambda i, n, r: self.progress.emit(i, n, r), stop=lambda: self.stop)
+        except Exception as e:      # models missing or not the expected files, no internet on first run
+            self.failed.emit(f'{type(e).__name__}: {e}')
+            n = 0
+        self.finished.emit(n)
+
+
+class AnalysisPage(QWidget):
+    done = Signal()
+
+    def __init__(self, win):
+        super().__init__()
+        self.win = win
+        self.thread = None
+        lay = QVBoxLayout(self)
+        lay.addWidget(h1('3  Analysis'))
+        row = QHBoxLayout()
+        self.b_start, self.b_stop = QPushButton('Start analysis'), QPushButton('Stop')
+        self.b_start.clicked.connect(self.start)
+        self.b_stop.clicked.connect(self.halt)
+        self.b_stop.setEnabled(False)
+        row.addWidget(self.b_start)
+        row.addWidget(self.b_stop)
+        row.addStretch()
+        lay.addLayout(row)
+        self.bar = QProgressBar()
+        lay.addWidget(self.bar)
+        self.status = note('')
+        lay.addWidget(self.status)
+        lay.addWidget(note('The first run downloads and verifies the models (about 830 MB, once, needs internet). '
+                           'You can stop and resume: photos already done are not redone.'))
+        self.grid = QListWidget()
+        self.grid.setViewMode(QListWidget.IconMode)
+        self.grid.setIconSize(QPixmap(180, 120).size())
+        self.grid.setResizeMode(QListWidget.Adjust)
+        self.grid.setSpacing(8)
+        lay.addWidget(self.grid, 1)
+
+    def show_project(self, p):
+        self.grid.clear()
+        for r in p.results():
+            self.add_thumb(r)
+        self.update_counts()
+
+    def add_thumb(self, r):
+        p = self.win.project
+        img = os.path.join(p.path, 'check', r['photo_id'] + '.jpg')
+        it = QListWidgetItem(QIcon(img) if os.path.exists(img) else QIcon(), f"{r['file']}\n{STATUS_LABEL.get(r.get('status'), '')}")
+        it.setForeground(QColor(STATUS_COLOUR.get(r.get('status'), '#1B1F24')))
+        it.setToolTip(flags_text(r.get('flags')))
+        self.grid.addItem(it)
+
+    def update_counts(self):
+        p = self.win.project
+        res = p.results()
+        c = {}
+        for r in res:
+            c[r.get('status')] = c.get(r.get('status'), 0) + 1
+        self.status.setText(f"Photos: {len(p.photos())} · to analyse: {len(p.pending())} · ok: {c.get('ok', 0)} · "
+                            f"to check: {c.get('to_check', 0)} · errors: {c.get('error', 0)}")
+
+    def start(self):
+        p = self.win.project
+        if p.settings['colour']['mode'] in ('reference', 'shared') and not os.path.exists(p.reference_csv):
+            QMessageBox.warning(self, 'Analysis', 'Choose the reference photo in Settings first.')
+            return
+        self.b_start.setEnabled(False)
+        self.b_stop.setEnabled(True)
+        self.bar.setValue(0)
+        self.worker = Worker(p)
+        self.thread = QThread()
+        self.worker.moveToThread(self.thread)
+        self.thread.started.connect(self.worker.run)
+        self.worker.progress.connect(self.on_progress)
+        self.worker.finished.connect(self.on_finished)
+        self.worker.failed.connect(self.on_failed)
+        self.thread.start()
+
+    def halt(self):
+        if self.thread is not None:
+            self.worker.stop = True
+            self.b_stop.setEnabled(False)
+
+    def on_progress(self, i, n, r):
+        self.bar.setMaximum(n)
+        self.bar.setValue(i)
+        self.add_thumb(r)
+        self.update_counts()
+
+    def on_failed(self, msg):
+        QMessageBox.critical(self, 'Analysis', 'Analysis not started.\n\n' + msg)
+
+    def on_finished(self, n):
+        self.thread.quit()
+        self.thread.wait()
+        self.thread = None
+        self.b_start.setEnabled(True)
+        self.b_stop.setEnabled(False)
+        self.show_project(self.win.project)
+        self.done.emit()
+
+
+class ClickLabel(QLabel):
+    clicked = Signal(float, float)
+
+    def mousePressEvent(self, e):
+        self.clicked.emit(e.position().x(), e.position().y())
+
+
+def load_pixmap(path):
+    r = QImageReader(path)
+    r.setAutoTransform(True)        # respect the EXIF rotation, like the analysis does
+    return QPixmap.fromImage(r.read())
+
+
+class ReviewPage(QWidget):
+    def __init__(self, win):
+        super().__init__()
+        self.win = win
+        lay = QVBoxLayout(self)
+        lay.addWidget(h1('4  Review'))
+        lay.addWidget(note('Most uncertain photos first. Fish not found or wrong outline? Click once on the fish '
+                           'in the photo and the outline is redone.'))
+        split = QSplitter()
+        self.list = QListWidget()
+        self.list.currentRowChanged.connect(self.show_item)
+        split.addWidget(self.list)
+        right = QWidget()
+        rl = QVBoxLayout(right)
+        self.image = ClickLabel()
+        self.image.setAlignment(Qt.AlignCenter)
+        self.image.setCursor(Qt.CrossCursor)
+        self.image.clicked.connect(self.click_fish)
+        self.shown = None           # (pixmap size, crop box in original pixels) of the picture on screen
+        self.image.setMinimumSize(400, 300)
+        rl.addWidget(self.image, 1)
+        self.info = note('')
+        rl.addWidget(self.info)
+        self.lab_box = QGroupBox('Label')
+        ll = QHBoxLayout(self.lab_box)
+        self.lab_img = QLabel()
+        self.lab_img.setFixedHeight(90)
+        self.lab_id = QLineEdit()
+        self.lab_id.setPlaceholderText('fish id')
+        b_lab = QPushButton('Save id')
+        b_lab.clicked.connect(self.save_label)
+        self.lab_id.returnPressed.connect(self.save_label)
+        ll.addWidget(self.lab_img, 1)
+        ll.addWidget(self.lab_id)
+        ll.addWidget(b_lab)
+        rl.addWidget(self.lab_box)
+        self.lab_box.hide()
+        row = QHBoxLayout()
+        for text, fn in (('Accept (Enter)', lambda: self.decide('reviewed')), ('Exclude the photo', lambda: self.decide('excluded')),
+                         ('Size only', lambda: self.set_analysis('size')),
+                         ('Size + colour', lambda: self.set_analysis('size_colour')),
+                         ('Open the original', self.open_original)):
+            b = QPushButton(text)
+            b.clicked.connect(fn)
+            row.addWidget(b)
+            if text.startswith('Accept'):
+                b.setShortcut(Qt.Key_Return)
+        row.addStretch()
+        rl.addLayout(row)
+        row = QHBoxLayout()
+        self.b_confirm = QPushButton('Confirm scale (the red line is 2 cm)')
+        self.b_confirm.clicked.connect(self.confirm_scale)
+        self.b_cal = QPushButton('Calibrate manually (draw a known length)')
+        self.b_cal.clicked.connect(self.start_calibration)
+        row.addWidget(self.b_confirm)
+        row.addWidget(self.b_cal)
+        row.addStretch()
+        rl.addLayout(row)
+        split.addWidget(right)
+        split.setSizes([260, 800])
+        lay.addWidget(split, 1)
+        self.items = []
+
+    def show_project(self, p):
+        order = {'error': 0, 'to_check': 1}
+        self.items = sorted((r for r in p.results() if r.get('status') in order),
+                            key=lambda r: (order[r['status']], -len((r.get('flags') or '').split(';'))))
+        self.list.clear()
+        for r in self.items:
+            it = QListWidgetItem(f"{r['file']}\n{flags_text(r.get('flags')).splitlines()[0]}")
+            it.setForeground(QColor(STATUS_COLOUR[r['status']]))
+            self.list.addItem(it)
+        if self.items:
+            self.list.setCurrentRow(0)
+        else:
+            self.image.clear()
+            self.info.setText('Nothing to check.')
+
+    def show_item(self, i):
+        if not 0 <= i < len(self.items):
+            return
+        r = self.items[i]
+        scale_issue = bool(set((r.get('flags') or '').split(';')) & scaleline.SCALE_FLAGS)
+        img = os.path.join(self.win.project.path, 'check', r['photo_id'] + '.jpg')
+        if os.path.exists(img) and r.get('check_box') and not scale_issue:
+            pm, box = load_pixmap(img), r['check_box']
+        else:                                   # whole photo: the paper or ruler may be far from the fish
+            pm = load_pixmap(r['path'])
+            box = [0, 0, pm.width(), pm.height()]
+        self.base = (pm, box)
+        line = r.get('scale_line') if scale_issue else None
+        self.draw([line] if line else [])
+        self.b_confirm.setVisible(bool(line))
+        mode = {'size': 'size only', 'size_colour': 'size + colour'}.get(r.get('analysis'), '')
+        text = f"{r['file']} ({r['folder']}) · {mode}\n{flags_text(r.get('flags'))}"
+        if line:
+            text += (f"\nScale found: {r['px_per_mm']:.2f} px/mm over {r.get('scale_squares') or '?'} squares. "
+                     'If the red line covers 2 cm (20 squares), Confirm; otherwise Calibrate manually.')
+        self.info.setText(text)
+        self.show_label(r)
+
+    def draw(self, lines, points=()):
+        """Photo on screen with red lines/points given in photo pixels."""
+        pm, box = self.base
+        if lines or points:
+            pm = pm.copy()
+            qp = QPainter(pm)
+            pen = QPen(QColor('#FF1744'))
+            pen.setWidthF(max(2.0, pm.width() / 400))
+            qp.setPen(pen)
+            for (ax, ay), (bx, by) in lines:
+                qp.drawLine(int(ax - box[0]), int(ay - box[1]), int(bx - box[0]), int(by - box[1]))
+            for x, y in points:
+                rr = max(4, pm.width() // 250)
+                qp.drawEllipse(int(x - box[0]) - rr, int(y - box[1]) - rr, 2 * rr, 2 * rr)
+            qp.end()
+        pm = pm.scaled(self.image.size(), Qt.KeepAspectRatio, Qt.SmoothTransformation)
+        self.image.setPixmap(pm)
+        self.shown = (pm.width(), pm.height(), box)
+
+    def current(self):
+        i = self.list.currentRow()
+        return self.items[i] if 0 <= i < len(self.items) else None
+
+    def confirm_scale(self):
+        r = self.current()
+        if r and r.get('scale_line'):
+            a, b = r['scale_line']
+            scaleline.save(self.win.project, r['path'], a, b, 20)
+            self.after_scale(r)
+
+    def start_calibration(self):
+        r = self.current()
+        if r is None:
+            return
+        from .calibrate import CalibrateDialog
+        d = CalibrateDialog(self, r['path'], r['folder'])
+        if d.exec():
+            a, b, mm, whole = d.result_line()
+            try:
+                ppm = scaleline.save(self.win.project, r['path'], a, b, mm, whole)
+                self.after_scale(r, f'Scale set: {ppm:.2f} px/mm.')
+            except ValueError as e:
+                QMessageBox.warning(self, 'Calibrate manually', str(e))
+
+    def after_scale(self, r, msg=None):
+        i = self.list.currentRow()
+        self.show_project(self.win.project)
+        rows = [j for j, it in enumerate(self.items) if it['path'] == r['path']]
+        if rows:
+            self.list.setCurrentRow(rows[0])
+        elif self.items:
+            self.list.setCurrentRow(min(i, len(self.items) - 1))
+        if msg:
+            self.info.setText(msg + '\n' + self.info.text())
+
+    def show_label(self, r):
+        box = r.get('label_box')
+        if not (box or r.get('label_needs_review')):
+            self.lab_box.hide()
+            return
+        self.lab_box.show()
+        self.lab_id.setText(r.get('label_id') or '')
+        self.lab_box.setTitle('Label read: ' + (r.get('label_text') or 'no text'))
+        self.lab_img.clear()
+        if box:
+            x, y, w, h = box
+            pad = int(0.2 * max(w, h))
+            full = load_pixmap(r['path'])
+            crop = full.copy(max(0, x - pad), max(0, y - pad), w + 2 * pad, h + 2 * pad)
+            self.lab_img.setPixmap(crop.scaledToHeight(90, Qt.SmoothTransformation))
+
+    def save_label(self):
+        i = self.list.currentRow()
+        if not 0 <= i < len(self.items) or not self.lab_id.text().strip():
+            return
+        self.win.project.set_label_id(self.items[i]['path'], self.lab_id.text().strip().upper())
+        self.items[i] = self.win.project.load_result(self.items[i]['path'])
+        self.show_item(i)
+
+    def click_fish(self, x, y):
+        i = self.list.currentRow()
+        if self.shown is None or not 0 <= i < len(self.items):
+            return
+        pw, ph, (x0, y0, x1, y1) = self.shown
+        fx = (x - (self.image.width() - pw) / 2) / pw
+        fy = (y - (self.image.height() - ph) / 2) / ph
+        if not (0 <= fx <= 1 and 0 <= fy <= 1):
+            return
+        r, p = self.items[i], self.win.project
+        photo = r['path']
+        QApplication.setOverrideCursor(Qt.WaitCursor)
+        try:
+            from ..engine import segment
+            img = pipeline.load_image(photo)
+            mask = segment.segment_fish_click(img, x0 + fx * (x1 - x0), y0 + fy * (y1 - y0))
+            areas = [o['fish_area_px'] for o in p.results() if o.get('fish_area_px') and o['path'] != photo]
+            if mask is None or not mask.any():
+                raise ValueError('no fish at that point: click in the middle of the body')
+            if areas and mask.sum() > 3 * float(np.median(areas)):
+                QApplication.restoreOverrideCursor()
+                keep = QMessageBox.question(
+                    self, 'Review', 'The new outline is much larger than the other fish: it probably includes the '
+                    'background. Keep it anyway? (No: click again, in the middle of the body)') == QMessageBox.Yes
+                QApplication.setOverrideCursor(Qt.WaitCursor)
+                if not keep:
+                    return
+            pipeline.save_manual_mask(p, photo, mask)
+            pipeline.analyse(p, os.path.dirname(photo), photo)
+        except Exception as e:
+            QMessageBox.warning(self, 'Review', f'Could not redo the outline: {e}')
+        finally:
+            QApplication.restoreOverrideCursor()
+        self.show_project(p)
+        for j, it in enumerate(self.items):          # stay on the same photo if it still needs a look
+            if it['path'] == photo:
+                self.list.setCurrentRow(j)
+                QMessageBox.information(self, 'Review', 'New outline saved. The photo still needs a look for:\n'
+                                        + flags_text(it.get('flags')) + '\n\nIf it is fine, press Accept.')
+
+    def set_analysis(self, mode):
+        i = self.list.currentRow()
+        if not 0 <= i < len(self.items):
+            return
+        photo = self.items[i]['path']
+        self.win.project.set_analysis(photo, mode)
+        self.items[i] = self.win.project.load_result(photo)
+        self.show_item(i)
+
+    def decide(self, status):
+        i = self.list.currentRow()
+        if not 0 <= i < len(self.items):
+            return
+        self.win.project.set_status(self.items[i]['path'], status)
+        self.show_project(self.win.project)
+        self.list.setCurrentRow(min(i, len(self.items) - 1))
+
+    def open_original(self):
+        i = self.list.currentRow()
+        if 0 <= i < len(self.items):
+            path = self.items[i].get('path', '')
+            if os.path.isfile(path) and path.lower().endswith(metadata.IMAGE_EXT):    # never launch anything but a photo
+                QDesktopServices.openUrl(QUrl.fromLocalFile(path))
+
+
+class ResultsPage(QWidget):
+    COLS = ['file', 'folder', 'label_id', 'status', 'colour_chart', 'px_per_mm', 'mask_length_mm',
+            'fish_area_mm2', 'body_area_mm2', 'max_depth_mm', 'flags']
+
+    def __init__(self, win):
+        super().__init__()
+        self.win = win
+        lay = QVBoxLayout(self)
+        lay.addWidget(h1('5  Results'))
+        row = QHBoxLayout()
+        b = QPushButton('Export CSV for R')
+        b.clicked.connect(self.export)
+        b2 = QPushButton('Open the export folder')
+        b2.clicked.connect(lambda: QDesktopServices.openUrl(QUrl.fromLocalFile(self.win.project.dir('export'))))
+        row.addWidget(b)
+        row.addWidget(b2)
+        row.addStretch()
+        lay.addLayout(row)
+        self.msg = note('')
+        lay.addWidget(self.msg)
+        self.table = QTableWidget()
+        self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeToContents)
+        lay.addWidget(self.table, 1)
+
+    def show_project(self, p):
+        rows, _ = export.rows(p)
+        self.table.setColumnCount(len(self.COLS))
+        self.table.setHorizontalHeaderLabels(self.COLS)
+        self.table.setRowCount(len(rows))
+        for i, r in enumerate(rows):
+            for j, c in enumerate(self.COLS):
+                self.table.setItem(i, j, QTableWidgetItem(str(r.get(c, ''))))
+
+    def export(self):
+        path = export.write_csv(self.win.project)
+        self.msg.setText(f'Saved: {path}\nIn R: d <- read.csv("{path.replace(os.sep, "/")}")')
+
+
+# ---------------------------------------------------------------- window
+class MainWindow(QMainWindow):
+    def __init__(self):
+        super().__init__()
+        self.project = None
+        self.setWindowTitle(f'Guppy Colour {__version__}')
+        self.resize(1280, 800)
+        self.nav = QListWidget()
+        self.nav.setFixedWidth(220)
+        self.nav.setStyleSheet('QListWidget { font-size: 15px; } QListWidget::item { padding: 10px 8px; }')
+        self.stack = QStackedWidget()
+        from .training_page import TrainingPage
+        from .landmarks_page import LandmarksPage
+        try:
+            from .pattern_page import PatternPage
+            pattern = PatternPage(self)
+        except ImportError:          # screen 6 is added by its own module
+            pattern = None
+        self.pages = [ProjectPage(self), SettingsPage(self), AnalysisPage(self), ReviewPage(self), ResultsPage(self),
+                      pattern, TrainingPage(self), LandmarksPage(self)]
+        names = ['1  Project', '2  Settings', '3  Analysis', '4  Review', '5  Results', '6  Pattern and clusters',
+                 '7  Training', '8  Landmarks']
+        for name, page in zip(names, self.pages):
+            it = QListWidgetItem(name)
+            self.nav.addItem(it)
+            if page is None:
+                it.setFlags(Qt.NoItemFlags)
+                it.setToolTip('Coming in phase 3')
+                page = QWidget()
+            self.stack.addWidget(page)
+        self.nav.currentRowChanged.connect(self.go)
+        self.pages[0].opened.connect(self.set_project)
+        self.pages[2].done.connect(lambda: self.pages[3].show_project(self.project))
+        w = QWidget()
+        lay = QHBoxLayout(w)
+        lay.addWidget(self.nav)
+        lay.addWidget(self.stack, 1)
+        self.setCentralWidget(w)
+        self.enable_pages(False)
+        self.nav.setCurrentRow(0)
+
+    def enable_pages(self, on):
+        for i in range(1, len(self.pages)):
+            if self.pages[i] is None:
+                continue
+            it = self.nav.item(i)
+            it.setFlags(Qt.ItemIsEnabled | Qt.ItemIsSelectable if on else Qt.NoItemFlags)
+
+    def set_project(self, p):
+        self.project = p
+        self.setWindowTitle(f'Guppy Colour {__version__} · {p.name}')
+        self.enable_pages(True)
+        self.pages[0].show_project(p)
+        self.nav.setCurrentRow(1 if not p.results() else 2)
+
+    def go(self, i):
+        if i < 0 or i >= len(self.pages) or self.pages[i] is None:
+            return
+        if i > 0 and self.project is not None:
+            self.pages[i].show_project(self.project)
+        self.stack.setCurrentIndex(i)
+
+
+def launch(argv=None):
+    app = QApplication(argv or sys.argv)
+    app.setApplicationName('Guppy Colour')
+    win = MainWindow()
+    win.show()
+    return app.exec()

@@ -1,0 +1,17 @@
+# Direct dependencies of Guppy Colour. The installer uses requirements-win.txt (pinned, with hashes):
+# uv pip compile requirements.in --python-platform windows --python-version 3.12 --generate-hashes -o requirements-win.txt
+numpy
+scipy
+opencv-python
+pillow
+colour-science
+PySide6
+ultralytics==8.4.183
+torch
+torchvision
+clip-anytorch
+setuptools<81
+openpyxl
+defusedxml
+scikit-learn            # colour classes: random forest, trained in the app, saved as plain arrays (no pickle)
+rapidocr_onnxruntime

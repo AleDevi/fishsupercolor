@@ -1,0 +1,37 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "guppycolor"
+version = "0.6.0"
+description = "Batch measurement of fish colour patterns from photos"
+requires-python = ">=3.10"
+license = "AGPL-3.0-or-later"
+dependencies = [
+    "numpy",
+    "scipy",
+    "opencv-python",
+    "pillow",
+    "colour-science",
+    "PySide6",
+    "ultralytics>=8.3",
+    "clip-anytorch",        # text prompt for YOLOE without needing git
+    "setuptools<81",        # clip still imports pkg_resources
+    "openpyxl",             # list of valid ids from Excel
+    "defusedxml",
+    "scikit-learn",         # colour classes (training only; models are stored as plain arrays)
+    "rapidocr_onnxruntime", # labels in the photo (onnx, no torch); engine/labels.py also fetches PP-OCRv6
+]
+
+[project.scripts]
+guppycolor = "guppycolor.__main__:main"
+
+[project.gui-scripts]
+guppycolor-gui = "guppycolor.gui.main:launch"
+
+[tool.setuptools.packages.find]
+include = ["guppycolor*"]
+
+[tool.setuptools.package-data]
+guppycolor = ["profiles/*.json"]
