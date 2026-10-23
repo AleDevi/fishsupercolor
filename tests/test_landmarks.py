@@ -213,3 +213,48 @@ def test_no_console_goes_to_log(tmp_path, monkeypatch):
         assert log.read_text(encoding='utf-8') == 'progress\nhello\n'
     finally:
         f.close()
+
+
+def test_vertical_fish_head_is_found_by_its_eye():
+    """'Head on the left' only applies to a fish lying sideways; a vertical one is judged by its eye."""
+    import cv2
+    import numpy as np
+    from guppycolor.engine import morpho
+    img = np.full((900, 400, 3), 235, np.uint8)
+    cv2.ellipse(img, (200, 400), (60, 260), 0, 0, 360, (120, 110, 95), -1)
+    cv2.circle(img, (200, 185), 14, (10, 10, 10), -1)                 # eye near the top
+    mask = cv2.inRange(img, (100, 100, 80), (140, 130, 110)) > 0
+    mask = cv2.morphologyEx(mask.astype(np.uint8), cv2.MORPH_CLOSE, np.ones((41, 41), np.uint8)).astype(bool)
+    o = morpho.measure(mask, img, head='left')
+    assert o['snout'][1] < 300 and o['end'][1] > 500
+    a, b = o['depth_line']
+    assert abs(abs(a[0] - b[0]) - o['max_depth_px']) < 15
+
+
+def test_results_show_sl_and_measures_picture(photos):
+    from PySide6.QtWidgets import QApplication
+    from guppycolor import landmarks
+    from guppycolor.gui.main import MainWindow
+    app = QApplication.instance() or QApplication([])
+    p = analysed(photos)
+    photo = [ph for _, ph in p.photos()][0]
+    landmarks.save(p, photo, {'snout': [650.0, 645.0], 'peduncle_end': [1140.0, 650.0]})
+    w = MainWindow()
+    w.project = p
+    page = w.pages[4]
+    page.show_project(p)
+    assert 'standard_length_mm' in page.COLS and 'total_length_mm' in page.COLS
+    assert page.summary.text().startswith('Standard length (SL) on 1 of 3 photos')
+    row = [i for i, r in enumerate(page.rows) if r['path'] == photo][0]
+    page.show_row(row)
+    assert page.pm is not None and not page.pm.isNull()
+    w.close()
+
+
+def test_crop_has_room_at_head_and_tail():
+    import numpy as np
+    from guppycolor import landmarks
+    mask = np.zeros((1000, 2000), bool)
+    mask[450:550, 600:1400] = True
+    x0, y0, x1, y1 = landmarks.crop_box(mask, mask.shape)
+    assert 600 - x0 >= 0.29 * 800 and x1 - 1400 >= 0.29 * 800 and 450 - y0 < 600 - x0

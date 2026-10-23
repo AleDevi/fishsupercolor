@@ -18,7 +18,8 @@ from . import pipeline, profile
 SL_FROM, SL_TO = 'snout', 'peduncle_end'
 BASE = 'yolo11n-pose.pt'                    # starting weights, checked by engine/segment.ensure_weights
 BASE_SHA256 = '869e83fcdffdc7371fa4e34cd8e51c838cc729571d1635e5141e3075e9319dc0'
-CROP_MARGIN = 0.12
+CROP_MARGIN = 0.15          # around the outline, as a share of the fish length
+CROP_MARGIN_LONG = 0.30     # at both ends of the fish: the transparent caudal fin is often outside the outline
 MIN_CONF = 0.5
 
 
@@ -75,11 +76,15 @@ def standard_length_px(points):
     return None
 
 
-def crop_box(mask, shape, margin=CROP_MARGIN):
+def crop_box(mask, shape, margin=CROP_MARGIN, margin_long=CROP_MARGIN_LONG):
+    """(x0, y0, x1, y1) around the fish, with more room at the ends of its long side (head and tail)."""
     ys, xs = np.nonzero(mask)
-    pad = int(margin * max(np.ptp(xs), np.ptp(ys)))
-    return (int(max(0, xs.min() - pad)), int(max(0, ys.min() - pad)), int(min(shape[1], xs.max() + pad + 1)),
-            int(min(shape[0], ys.max() + pad + 1)))
+    w, h = np.ptp(xs), np.ptp(ys)
+    pad = margin * max(w, h)
+    long_pad = margin_long * max(w, h)
+    px, py = (long_pad, pad) if w >= h else (pad, long_pad)
+    return (int(max(0, xs.min() - px)), int(max(0, ys.min() - py)), int(min(shape[1], xs.max() + px + 1)),
+            int(min(shape[0], ys.max() + py + 1)))
 
 
 # ---------------------------------------------------------------- model

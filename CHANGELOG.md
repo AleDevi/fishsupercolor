@@ -10,6 +10,17 @@
 - Verified update from GitHub releases (off while the repository is private).
 - Landmark model export as plain tensors (safetensors/npz) rebuilt locally on import, so a shared file never goes through an unpickler (security review suggestion).
 
+## 0.9.0 (2026-10-23)
+- Results: the table now has `standard_length_mm` and `total_length_mm`; a line says on how many photos SL is
+  known and how to get it (landmarks on screen 8). Click a row to see the photo with its measures drawn
+  (outline, midline = mask length, snout, end of the outline, caudal peduncle, maximum depth, 5 mm bar) and the
+  landmarks with the SL line, plus a colour legend. Review shows the same drawing.
+- Fixed: on photos with the fish upright (head up or down) the "head on the left/right" setting put the snout on
+  the tail, so the body area and the maximum depth were measured from the wrong end. The setting now applies only
+  to fish lying sideways; upright fish are judged by the eye. Run the Analysis again on such photos.
+- Training and Landmarks screens: the crop around the fish leaves more room at the head and the tail (30% of the
+  fish length), so the transparent caudal fin is no longer cut off.
+
 ## 0.8.2 (2026-10-23)
 - Fixed: landmark training stopped with "'NoneType' object has no attribute 'write'" when the app was opened from
   the desktop icon (no console window, so the training progress text had nowhere to go). That text now goes to

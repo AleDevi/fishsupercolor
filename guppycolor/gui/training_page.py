@@ -12,7 +12,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from .. import profile, training, verify
+from .. import landmarks, profile, training, verify
 from . import modelfiles
 
 
@@ -339,10 +339,7 @@ class TrainingPage(QWidget):
         p, photo = self.project, self.items[i]
         img = training.corrected_image(p, photo)
         mask = training.fish_mask(p, photo)
-        ys, xs = np.nonzero(mask)
-        pad = int(0.15 * max(np.ptp(xs), np.ptp(ys)))
-        x0, y0 = max(0, xs.min() - pad), max(0, ys.min() - pad)
-        x1, y1 = min(img.shape[1], xs.max() + pad + 1), min(img.shape[0], ys.max() + pad + 1)
+        x0, y0, x1, y1 = landmarks.crop_box(mask, img.shape)
         full = training.load_strokes(p, photo, img.shape)
         self.current = (photo, full, (x0, y0, x1, y1), img, mask)
         self.view.set_photo(img[y0:y1, x0:x1], full[y0:y1, x0:x1].copy(), self.view.colours)

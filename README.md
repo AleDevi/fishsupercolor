@@ -103,7 +103,18 @@ of a known length (2 cm by default, the longer the more precise), type its lengt
 the other photos of the folder* when the camera did not move. The scale drawn by hand stays for later analyses.
 
 ### 5 Results
-Table of the main measures and **Export CSV for R** (`export/measurements.csv`).
+Table of the main measures (SL, TL, mask length, depth, areas) and **Export CSV for R** (`export/measurements.csv`).
+Above the table: on how many photos the standard length (SL) is known. SL needs the landmarks (snout and end of the
+caudal peduncle), clicked on screen 8 or predicted by a landmark model; without them it is `NA`.
+
+Click a row to see how that fish was measured. The lines are drawn on the photo at analysis time:
+- magenta: outline of the fish (fish and body areas);
+- cyan: midline, from the snout (green) to the end of the outline (red) = `mask_length_mm`;
+- orange: end of the body at the caudal peduncle, only when the tail fin is in the outline (body area stops there);
+- yellow: maximum depth; white bar: 5 mm, when the scale is known;
+- blue dots and line: the landmarks and the SL, as they are now (they change as soon as you click them on screen 8).
+
+Photos analysed before 0.9.0 show only the outline: run the Analysis again to get the drawing.
 
 ### 6 Pattern and clusters
 After the analysis with a colour model, open screen 6 and press **Align and compare**. Every fish is stretched onto the average body shape, so a spot in the same place on two fish lands on the same pixels. Coordinates are in body lengths: x = 0 at the snout and 1 at the caudal peduncle, y from the snout–peduncle line, positive towards the back.
@@ -243,7 +254,7 @@ In R, the spots of one class: `strsplit(d$spots_orange_mm2, ";")`.
   colour_reference.csv    colour reference (Patch,Name,R,G,B)
   results/<photo>.json    everything measured on each photo (pixels)
   masks/<photo>.png       fish outline; <photo>_manual.png = outline redone in Review
-  check/<photo>.jpg       outline drawn on the fish; <photo>_colours.jpg = colour classes
+  check/<photo>.jpg       outline and measures drawn on the fish; <photo>_colours.jpg = colour classes
   training/strokes/       painted strokes (one PNG per photo, value = brush number)
   training/images/        colour-corrected photos used for training (cache)
   models/colours_vN.npz   colour models (+ .json with date, annotator, photos, pixels per class)

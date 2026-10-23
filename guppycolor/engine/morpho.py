@@ -24,7 +24,8 @@ def measure(mask, img=None, nbin=300, head=None):
     head_first = wsm[int(0.05*nbin):int(0.30*nbin)].mean() >= wsm[int(0.70*nbin):int(0.95*nbin)].mean()
     eye = find_eye(m, img, t, n, wsm.max()) if img is not None else None
     if eye is not None: head_first = eye < 0.5*(t.min() + t.max())       # the eye marks the head
-    if head in ('left', 'right'): head_first = (ax[0] > 0) == (head == 'left')   # told by the user
+    if head in ('left', 'right') and abs(ax[0]) > 0.7:          # told by the user; only for a fish lying sideways,
+        head_first = (ax[0] > 0) == (head == 'left')           # a vertical one is judged by its eye / shape
     if not head_first:                          # flip so index 0 = snout
         ax, nx = -ax, -nx; t, n = -t, -n; width, wsm, mid = width[::-1], wsm[::-1], -mid[::-1]
         edges = -edges[::-1]
@@ -45,7 +46,10 @@ def measure(mask, img=None, nbin=300, head=None):
     total = np.hypot(*np.diff(pts, axis=0).T).sum() + step
     tt = (np.c_[xs, ys] - c) @ ax
     body = (tt <= tc[i_sl] + step/2)
-    return dict(sl_px=float(seg), tl_px=float(total), area_px=int(m.sum()), body_area_px=int(body.sum()),
+    # where the maximum depth is measured: the two edges of the outline across the axis at that point
+    i_d = int(np.argmax(wsm[:i_sl+1])); nd = n[b == (i_d if head_first else nbin - 1 - i_d)]
+    depth_line = [c + tc[i_d]*ax + nd.min()*nx, c + tc[i_d]*ax + nd.max()*nx] if nd.size else None
+    return dict(depth_line=depth_line, line=pts, sl_px=float(seg), tl_px=float(total), area_px=int(m.sum()), body_area_px=int(body.sum()),
                 max_depth_px=float(wsm[:i_sl+1].max()), fin_found=bool(fin), head_first_axis=bool(head_first),
                 snout=pts[0], ped=pts[i_sl], end=pts[-1], midline=pts[:i_sl+1], axis=ax, normal=nx,
                 ped_width=float(wsm[i_sl]), mask=m)

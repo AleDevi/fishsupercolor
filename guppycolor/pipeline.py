@@ -257,8 +257,15 @@ def touches_border(mask, margin=3):
     return bool(mask[:margin].any() or mask[-margin:].any() or mask[:, :margin].any() or mask[:, -margin:].any())
 
 
-def save_overlay(path, img, mask, morph, max_side=1200, margin=0.3):
-    """Crop around the fish (it can be ~3% of a wide shot), thick magenta contour.
+# colours of the measures drawn on check/<photo>.jpg (RGB); the Results and Review screens explain them
+MEASURE_COLOURS = {'outline': (230, 0, 200), 'midline': (0, 220, 255), 'snout': (0, 200, 0), 'end': (255, 30, 30),
+                   'peduncle': (255, 140, 0), 'depth': (255, 230, 0), 'scale': (255, 255, 255)}
+
+
+def save_overlay(path, img, mask, morph, max_side=1200, margin=0.3, ppm=None):
+    """Crop around the fish (it can be ~3% of a wide shot) with the measures drawn: outline (magenta), midline =
+    mask length (cyan) from the snout (green) to the end of the outline (red), end of the body = caudal peduncle when
+    the fin is in the outline (orange), maximum depth (yellow), 5 mm bar (white).
     Returns the crop box (x0, y0, x1, y1) in original pixels, to map clicks back."""
     ys, xs = np.nonzero(mask)
     pad = int(margin * max(np.ptp(xs), np.ptp(ys)))
@@ -269,11 +276,34 @@ def save_overlay(path, img, mask, morph, max_side=1200, margin=0.3):
     vis = cv2.resize(vis, None, fx=s, fy=s, interpolation=cv2.INTER_AREA)
     m = cv2.resize(mask[y0:y1, x0:x1].astype(np.uint8), (vis.shape[1], vis.shape[0]), interpolation=cv2.INTER_NEAREST)
     cnts = cv2.findContours(m, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)[0]
-    t = max(3, max(vis.shape[:2]) // 250)
-    cv2.drawContours(vis, cnts, -1, (230, 0, 200), t)
+    t = max(2, max(vis.shape[:2]) // 400)
+    C = MEASURE_COLOURS
+    cv2.drawContours(vis, cnts, -1, C['outline'], t)
+    to = (lambda p: (int(round((p[0] - x0) * s)), int(round((p[1] - y0) * s))))
     if morph is not None:
-        x, y = morph['snout']
-        cv2.circle(vis, (int((x - x0) * s), int((y - y0) * s)), 3 * t, (255, 200, 0), t)
+        line = morph.get('line')
+        if line is not None:
+            cv2.polylines(vis, [np.array([to(p) for p in line], np.int32)], False, C['midline'], t, cv2.LINE_AA)
+        half = 0.65 * morph['max_depth_px'] * np.asarray(morph['normal'])
+        ticks = [(morph['snout'], 'snout'), (morph['end'], 'end')]
+        if morph.get('fin_found'):
+            ticks.append((morph['ped'], 'peduncle'))
+        for p, k in ticks:
+            p = np.asarray(p)
+            cv2.line(vis, to(p - half), to(p + half), C[k], t + 1, cv2.LINE_AA)
+        if morph.get('depth_line') is not None:
+            a, b = morph['depth_line']
+            cv2.line(vis, to(a), to(b), C['depth'], t + 1, cv2.LINE_AA)
+    if ppm:
+        bar = int(round(5 * ppm * s))
+        if 0 < bar < vis.shape[1] - 40:
+            h = vis.shape[0]
+            cv2.line(vis, (20, h - 20), (20 + bar, h - 20), (0, 0, 0), t + 4)
+            cv2.line(vis, (20, h - 20), (20 + bar, h - 20), C['scale'], t + 1)
+            cv2.putText(vis, '5 mm', (20, h - 20 - 4 * t), cv2.FONT_HERSHEY_SIMPLEX, 0.5 + t / 6, (0, 0, 0), t + 2,
+                        cv2.LINE_AA)
+            cv2.putText(vis, '5 mm', (20, h - 20 - 4 * t), cv2.FONT_HERSHEY_SIMPLEX, 0.5 + t / 6, C['scale'], t,
+                        cv2.LINE_AA)
     Image.fromarray(vis).save(path, quality=88)
     return [int(x0), int(y0), int(x1), int(y1)]
 
@@ -405,7 +435,8 @@ def analyse(project, folder, photo, segmenter=None, reference=None, expected_ids
         if r['saturated_pct'] > 1:
             flags.append('overexposed')
         cv2.imwrite(os.path.join(project.dir('masks'), pid + '.png'), mask.astype(np.uint8) * 255)
-        r['check_box'] = save_overlay(os.path.join(project.dir('check'), pid + '.jpg'), corrected, mask, morph)
+        r['check_box'] = save_overlay(os.path.join(project.dir('check'), pid + '.jpg'), corrected, mask, morph,
+                                      ppm=r.get('px_per_mm') if r.get('scale_ok') else None)
         r['analysis'] = old.get('analysis_manual') or analysis_mode(r, photo, st)
         if old.get('analysis_manual'):
             r['analysis_manual'] = old['analysis_manual']

@@ -9,8 +9,8 @@ from PySide6.QtGui import QColor, QDesktopServices, QIcon, QImageReader, QPainte
 from PySide6.QtWidgets import (
     QApplication, QButtonGroup, QCheckBox, QDoubleSpinBox, QFileDialog, QFormLayout, QGroupBox, QHBoxLayout,
     QHeaderView, QInputDialog, QLabel, QLineEdit, QListWidget, QListWidgetItem, QMainWindow, QMessageBox,
-    QFrame, QProgressBar, QPushButton, QRadioButton, QScrollArea, QSplitter, QStackedWidget, QTableWidget,
-    QTableWidgetItem, QVBoxLayout, QWidget,
+    QFrame, QProgressBar, QPushButton, QRadioButton, QScrollArea, QSizePolicy, QSplitter, QStackedWidget,
+    QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget,
 )
 
 from .. import __version__, export, metadata, pipeline, profile, scaleline
@@ -737,6 +737,9 @@ class ReviewPage(QWidget):
         self.b_confirm.setVisible(bool(line))
         mode = {'size': 'size only', 'size_colour': 'size + colour'}.get(r.get('analysis'), '')
         text = f"{r['file']} ({r['folder']}) · {mode}\n{flags_text(r.get('flags'))}"
+        if box is r.get('check_box'):
+            text += ('\nLines: magenta outline, cyan midline (mask length), green snout, red end of the outline, '
+                     'orange end of the body, yellow maximum depth (legend in 5 Results).')
         if line:
             text += (f"\nScale found: {r['px_per_mm']:.2f} px/mm over {r.get('scale_squares') or '?'} squares. "
                      'If the red line covers 2 cm (20 squares), Confirm; otherwise Calibrate manually.')
@@ -896,9 +899,54 @@ class ReviewPage(QWidget):
                 QDesktopServices.openUrl(QUrl.fromLocalFile(path))
 
 
+def measures_legend():
+    """Coloured legend of the measures drawn on the check pictures (pipeline.save_overlay) and of the landmarks."""
+    c = pipeline.MEASURE_COLOURS
+    hexc = (lambda k: '#%02x%02x%02x' % c[k])
+    items = [('outline', 'outline of the fish (areas)'), ('midline', 'midline: mask length, snout to end of the outline'),
+             ('snout', 'snout'), ('end', 'end of the outline'),
+             ('peduncle', 'end of the body (caudal peduncle), only when the tail fin is in the outline'),
+             ('depth', 'maximum depth')]
+    rows = [f'<span style="color:{hexc(k)}; font-weight:700">&#9644;</span> {t}' for k, t in items]
+    rows.append(f'<span style="color:{LANDMARK_COLOUR}; font-weight:700">&#9679;&#9644;</span> landmarks and '
+                'standard length (SL, snout to end of the peduncle)')
+    return '<br>'.join(rows)
+
+
+LANDMARK_COLOUR = '#2979FF'
+
+
+def measures_pixmap(project, r):
+    """check/<photo>.jpg (measures drawn at analysis) + the landmarks as they are now, or None."""
+    img = os.path.join(project.path, 'check', r['photo_id'] + '.jpg')
+    if not (os.path.exists(img) and r.get('check_box')):
+        return None
+    pm = load_pixmap(img)
+    pts = r.get('landmarks') or {}
+    if pts and not pm.isNull():
+        x0, y0, x1, _ = r['check_box']
+        s = pm.width() / max(x1 - x0, 1)
+        to = (lambda p: (int((p[0] - x0) * s), int((p[1] - y0) * s)))
+        qp = QPainter(pm)
+        qp.setRenderHint(QPainter.Antialiasing)
+        pen = QPen(QColor(LANDMARK_COLOUR))
+        pen.setWidthF(max(2.0, pm.width() / 200))
+        qp.setPen(pen)
+        if pts.get('snout') and pts.get('peduncle_end'):
+            (ax, ay), (bx, by) = to(pts['snout']), to(pts['peduncle_end'])
+            qp.drawLine(ax, ay, bx, by)
+        qp.setBrush(QColor(LANDMARK_COLOUR))
+        rr = max(5, pm.width() // 90)
+        for p in pts.values():
+            x, y = to(p)
+            qp.drawEllipse(x - rr, y - rr, 2 * rr, 2 * rr)
+        qp.end()
+    return pm
+
+
 class ResultsPage(QWidget):
-    COLS = ['file', 'folder', 'label_id', 'status', 'colour_chart', 'px_per_mm', 'mask_length_mm',
-            'fish_area_mm2', 'body_area_mm2', 'max_depth_mm', 'flags']
+    COLS = ['file', 'folder', 'label_id', 'status', 'px_per_mm', 'standard_length_mm', 'total_length_mm',
+            'mask_length_mm', 'max_depth_mm', 'fish_area_mm2', 'body_area_mm2', 'colour_chart', 'flags']
 
     def __init__(self, win):
         super().__init__()
@@ -916,18 +964,76 @@ class ResultsPage(QWidget):
         lay.addLayout(row)
         self.msg = note('')
         lay.addWidget(self.msg)
+        self.summary = note('')
+        lay.addWidget(self.summary)
+        split = QSplitter(Qt.Vertical)
         self.table = QTableWidget()
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeToContents)
-        lay.addWidget(self.table, 1)
+        self.table.setSelectionBehavior(QTableWidget.SelectRows)
+        self.table.setSelectionMode(QTableWidget.SingleSelection)
+        self.table.setEditTriggers(QTableWidget.NoEditTriggers)
+        self.table.currentCellChanged.connect(lambda r, *_: self.show_row(r))
+        split.addWidget(self.table)
+        bottom = QWidget()
+        bl = QHBoxLayout(bottom)
+        bl.setContentsMargins(0, 0, 0, 0)
+        self.image = QLabel('Click a row to see how its measures were taken.')
+        self.image.setAlignment(Qt.AlignCenter)
+        self.image.setMinimumSize(300, 200)
+        self.image.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Ignored)
+        bl.addWidget(self.image, 3)
+        self.legend = QLabel()
+        self.legend.setWordWrap(True)
+        self.legend.setAlignment(Qt.AlignTop | Qt.AlignLeft)
+        self.legend.setTextFormat(Qt.RichText)
+        bl.addWidget(self.legend, 2)
+        split.addWidget(bottom)
+        split.setSizes([400, 350])
+        lay.addWidget(split, 1)
+        self.rows = []
+        self.pm = None
 
     def show_project(self, p):
         rows, _ = export.rows(p)
+        self.rows = rows
         self.table.setColumnCount(len(self.COLS))
         self.table.setHorizontalHeaderLabels(self.COLS)
         self.table.setRowCount(len(rows))
         for i, r in enumerate(rows):
             for j, c in enumerate(self.COLS):
                 self.table.setItem(i, j, QTableWidgetItem(str(r.get(c, ''))))
+        n_sl = sum(r.get('standard_length_mm') not in (None, '', 'NA') for r in rows)
+        text = f'Standard length (SL) on {n_sl} of {len(rows)} photos.'
+        if n_sl < len(rows):
+            text += (' SL comes from the landmarks (snout and end of the caudal peduncle): click them on screen '
+                     '8 Landmarks, or train a landmark model there and run the Analysis again. '
+                     'mask_length_mm is the length of the outline, which often misses the transparent tail fin.')
+        self.summary.setText(text)
+        self.legend.setText(measures_legend())
+        self.image.clear()
+        self.image.setText('Click a row to see how its measures were taken.')
+        self.pm = None
+        if rows:
+            self.table.selectRow(0)
+
+    def show_row(self, i):
+        if not 0 <= i < len(self.rows) or self.win.project is None:
+            return
+        r = self.win.project.load_result(self.rows[i]['path'])
+        self.pm = measures_pixmap(self.win.project, r) if r else None
+        if self.pm is None or self.pm.isNull():
+            self.image.clear()
+            self.image.setText('No picture of the measures for this photo (run the Analysis again).')
+            return
+        self.fit()
+
+    def fit(self):
+        if self.pm is not None and not self.pm.isNull():
+            self.image.setPixmap(self.pm.scaled(self.image.size(), Qt.KeepAspectRatio, Qt.SmoothTransformation))
+
+    def resizeEvent(self, e):
+        super().resizeEvent(e)
+        self.fit()
 
     def export(self):
         path = export.write_csv(self.win.project)
