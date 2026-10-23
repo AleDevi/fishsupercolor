@@ -10,6 +10,11 @@
 - Verified update from GitHub releases (off while the repository is private).
 - Landmark model export as plain tensors (safetensors/npz) rebuilt locally on import, so a shared file never goes through an unpickler (security review suggestion).
 
+## 0.8.2 (2026-10-23)
+- Fixed: landmark training stopped with "'NoneType' object has no attribute 'write'" when the app was opened from
+  the desktop icon (no console window, so the training progress text had nowhere to go). That text now goes to
+  `%LOCALAPPDATA%\GuppyColour\guppycolour.log`, rewritten at every start.
+
 ## 0.8.1 (2026-10-23)
 - Every screen scrolls when the window is too small for it, instead of cutting the bottom or squashing the
   texts on top of each other.

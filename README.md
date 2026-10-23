@@ -29,7 +29,9 @@ You need Python 3.12 from python.org (no other Python knowledge needed). Python 
 
 The first analysis downloads the fish-finding models (about 830 MB, once) into
 `C:\Users\<you>\.guppycolor\models` and checks them. If the icon does not open, run `start_guppycolour.bat`:
-it shows the error messages.
+it shows the error messages. When opened from the icon, the technical messages (for example the progress of
+landmark training) are written to `%LOCALAPPDATA%\GuppyColour\guppycolour.log`, rewritten at every start: send
+that file along when something goes wrong.
 
 To update, unzip the new version and run `install_windows.bat` again. Projects are kept. The update reuses the
 installed packages: only the app itself and any package whose version changed are downloaded.

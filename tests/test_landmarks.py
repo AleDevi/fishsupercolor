@@ -197,3 +197,19 @@ def test_add_to_outline(monkeypatch):
     assert new[100, 300] and new[85, 60] and not new[15, 15]            # fin joined, far island left out
     monkeypatch.setattr(segment, 'segment_fish_click', lambda img, x, y, more=(): island)
     assert segment.add_to_mask(np.zeros((200, 400, 3), np.uint8), mask, 15, 15) is None
+
+
+def test_no_console_goes_to_log(tmp_path, monkeypatch):
+    """Started from the desktop icon (pythonw) sys.stdout/stderr are None; training progress bars must not crash."""
+    import sys
+    from guppycolor.__main__ import quiet_console
+    monkeypatch.setattr(sys, 'stdout', None)
+    monkeypatch.setattr(sys, 'stderr', None)
+    log = tmp_path / 'sub' / 'guppycolour.log'
+    f = quiet_console(str(log))
+    try:
+        sys.stderr.write('progress\n')
+        print('hello')
+        assert log.read_text(encoding='utf-8') == 'progress\nhello\n'
+    finally:
+        f.close()
