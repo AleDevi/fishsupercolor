@@ -19,9 +19,11 @@ if not defined PY (
 )
 echo  Using Python: %PY%
 if not exist "%HOME_APP%" mkdir "%HOME_APP%"
-rem An existing installation with Python 3.12 is updated in place: packages already there are not downloaded again.
+rem An installation made by this installer (marker file) with Python 3.12 is updated in place: packages already
+rem there are not downloaded again. Anything else is removed and installed from scratch.
+set "MARK=%VENV%\guppycolour-installed.txt"
 set "FRESH=1"
-if exist "%VENV%\Scripts\python.exe" "%VENV%\Scripts\python.exe" -c "import sys; sys.exit(sys.version_info[:2] != (3, 12))" >nul 2>nul && set "FRESH="
+if exist "%MARK%" if exist "%VENV%\Scripts\python.exe" "%VENV%\Scripts\python.exe" -c "import sys; sys.exit(sys.version_info[:2] != (3, 12))" >nul 2>nul && set "FRESH="
 if defined FRESH (
   if exist "%VENV%" rmdir /s /q "%VENV%"
   %PY% -m venv "%VENV%" || goto error
@@ -32,6 +34,7 @@ rem No pip cache (saves about 1 GB of disk) and no "new pip version" notice.
 set "PIPOPT=--disable-pip-version-check --no-cache-dir"
 "%VENV%\Scripts\python.exe" -m pip install %PIPOPT% --require-hashes --only-binary=:all: -r "%APP%requirements-win.txt" || goto error
 "%VENV%\Scripts\python.exe" -m pip install %PIPOPT% --no-deps --no-build-isolation --force-reinstall "%APP%." || goto error
+> "%MARK%" echo Installed by install_windows.bat from requirements-win.txt with hash checks.
 powershell -NoProfile -Command ^
   "$s = (New-Object -ComObject WScript.Shell).CreateShortcut([Environment]::GetFolderPath('Desktop') + '\Guppy Colour.lnk');" ^
   "$s.TargetPath = '%VENV%\Scripts\pythonw.exe'; $s.Arguments = '-m guppycolor'; $s.WorkingDirectory = '%HOME_APP%'; $s.Save()" || goto error

@@ -10,7 +10,8 @@
 - Verified update from GitHub releases (off while the repository is private).
 
 ## 0.6.1 (2026-10-23)
-- Installer updates an existing installation in place (packages already installed are not downloaded again),
+- Installer updates an installation it made itself (marker file `venv\guppycolour-installed.txt`) in place (packages
+  already installed are not downloaded again; any other venv is replaced),
   keeps no pip cache (about 1 GB less on disk), hides pip's "new version" notice, and accepts only Python 3.12
   again (3.13 fails on `rapidocr-onnxruntime`). README: what can be deleted to free disk space.
 - GitHub Actions: tests on Windows/Python 3.12 at every push, releases from a `v<version>` tag.
