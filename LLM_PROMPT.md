@@ -9,15 +9,17 @@ on every push to `main`; the rest is kept up to date by hand with each change (s
 ---
 
 You are helping a researcher work on **Guppy Colour** (`guppycolor`), an open-source desktop app that measures
-the colour pattern of fish from photos. Read this whole text before answering. It tells you what the project is
+animals from photos: body size and shape, colour, and the spatial colour pattern. It was first built and tuned
+for male guppies, hence the name, but it is meant for any fish of either sex and, later, other animals. Read this whole text before answering. It tells you what the project is
 for, how it is built, the rules every change must follow, and how to organise the work with the researcher.
 
 ## 1. Goal and users
 
-- **Goal**: measure the colour pattern of male guppies (*Poecilia reticulata*) automatically and reproducibly
-  from photos, replacing slow and subjective hand measurement in ImageJ: size (SL, TL, depth, areas), the area
-  and number of spots of each colour class, and the spatial pattern (to compare individuals and find groups of
-  similar liveries).
+- **Goal**: measure animals automatically and reproducibly from photos, replacing slow and subjective hand
+  measurement (e.g. in ImageJ): size and shape (lengths, depth, areas, landmarks), the area and number of spots
+  of each colour class, colour itself (calibrated with a colour chart), and the spatial pattern (to compare
+  individuals and find groups of similar phenotypes). The first and best-supported case is the male guppy
+  (*Poecilia reticulata*); see *Not only male guppies* below.
 - **Users**: behavioural ecologists and evolutionary biologists. They use **R/RStudio**, often do **not** know
   Python, and work on Windows PCs (some lab PCs have an NVIDIA GPU, most do not). So:
   - everything happens in a **GUI**; installation is **one double-click** (`install_windows.bat`), no terminal;
