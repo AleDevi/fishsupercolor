@@ -5,8 +5,11 @@ the colour chart, finds the fish outline, reads the scale from graph paper, meas
 the fish id, measures the area of each colour class with a model you train in the app, and writes one CSV
 row per fish, ready for R.
 
-It was built for male guppies (*Poecilia reticulata*), but everything species-specific (body parts, colour
-classes, landmarks) lives in a species profile, so other species can be added.
+**Scope.** The app is tuned first for male guppies (*Poecilia reticulata*), but it is meant for any fish, both
+sexes, and later possibly other animals. Nothing about guppies is hard-wired: body parts, colour classes and
+landmarks (with the ones used for SL, TL and body depth) live in a profile per species and sex
+(`guppycolor/profiles/`), and new features are built on that. Profiles for female guppies and other species
+are planned; photos of them can already be analysed for outline, size and colour.
 
 - [Install (Windows)](#install-windows)
 - [Workflow](#workflow)
