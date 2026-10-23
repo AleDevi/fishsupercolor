@@ -31,7 +31,13 @@ The first analysis downloads the fish-finding models (about 830 MB, once) into
 `C:\Users\<you>\.guppycolor\models` and checks them. If the icon does not open, run `start_guppycolour.bat`:
 it shows the error messages.
 
-To update, unzip the new version and run `install_windows.bat` again. Projects are kept.
+To update, unzip the new version and run `install_windows.bat` again. Projects are kept. The update reuses the
+installed packages: only the app itself and any package whose version changed are downloaded.
+
+**Disk space.** What the app keeps: `%LOCALAPPDATA%\GuppyColour\venv` (Python packages, about 1.5 GB) and
+`C:\Users\<you>\.guppycolor\models` (models, about 830 MB, downloaded once). Safe to delete: old
+`GuppyColour_*.zip` files and their unzipped folders, and the pip cache left by versions before 0.6.1
+(`py -3.12 -m pip cache purge`, or delete `%LOCALAPPDATA%\pip\Cache`). The installer no longer fills that cache.
 
 ## Workflow
 
