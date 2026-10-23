@@ -56,6 +56,11 @@ def save(project, photo, points):
         r.update(landmarks=points, landmarks_source='manual')
         if sl:
             r['standard_length_px'] = round(sl, 1)
+        tl = pipeline.landmarks_tl(points)
+        if tl and r.get('total_length_source') != 'outline':     # the fin is not all in the outline
+            r['total_length_px'], r['total_length_source'] = round(tl, 1), 'landmarks'
+        elif not tl and r.get('total_length_source') == 'landmarks':
+            r.pop('total_length_px', None); r.pop('total_length_source', None)
         r['flags'] = ';'.join(f for f in (r.get('flags') or '').split(';') if f and f != 'sl_landmarks_missing')
         project.save_result(photo, r)
 

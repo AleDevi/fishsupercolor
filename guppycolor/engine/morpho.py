@@ -29,8 +29,10 @@ def measure(mask, img=None, nbin=300, head=None):
         ax, nx = -ax, -nx; t, n = -t, -n; width, wsm, mid = width[::-1], wsm[::-1], -mid[::-1]
         edges = -edges[::-1]
     # caudal peduncle: narrowest point in the posterior part, if the fin widens again after it
+    # (the narrowest point before the widest part of the fin: the fin's own edge tapers too, and is not it)
     lo, hi = int(0.55*nbin), int(0.97*nbin)
-    i_min = lo + int(np.argmin(wsm[lo:hi]))
+    i_max = lo + int(np.argmax(wsm[lo:]))
+    i_min = lo + int(np.argmin(wsm[lo:max(i_max, lo + 1)])) if i_max > lo else lo + int(np.argmin(wsm[lo:hi]))
     flare = wsm[i_min:].max() / max(wsm[i_min], 1e-9)
     fin = flare > 1.15
     i_sl = i_min if fin else nbin - 1

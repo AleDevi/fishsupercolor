@@ -107,10 +107,31 @@ def segment_fish(img, work=1600):
     m = cv2.resize(m.astype(np.uint8), (w, h), interpolation=cv2.INTER_NEAREST).astype(bool)
     return m, box / s, conf
 
-def segment_fish_click(img, x, y, work=1600):
-    """One positive click on the fish (full-res pixel coordinates) -> SAM 2.1 mask."""
+def segment_fish_click(img, x, y, work=1600, more=()):
+    """Positive click(s) on the fish (full-res pixel coordinates) -> SAM 2.1 mask. `more`: other points that are
+    also fish (e.g. a point inside the outline found so far, when a click adds the tail)."""
     _, sam = models()
     h, w = img.shape[:2]; s = work / max(h, w)
     small = cv2.resize(img, (int(w*s), int(h*s)), interpolation=cv2.INTER_AREA)
-    m = sam.predict(small[..., ::-1], points=[[x*s, y*s]], labels=[1], verbose=False)[0].masks.data[0].cpu().numpy()
+    pts = [[x*s, y*s]] + [[px*s, py*s] for px, py in more]
+    m = sam.predict(small[..., ::-1], points=[pts], labels=[[1]*len(pts)], verbose=False)[0].masks.data[0].cpu().numpy()
     return cv2.resize(m.astype(np.uint8), (w, h), interpolation=cv2.INTER_NEAREST).astype(bool)
+
+
+def add_to_mask(img, mask, x, y):
+    """Grow an outline with the part clicked at (x, y), e.g. a transparent caudal fin: SAM is asked for the fish
+    through the click and a point well inside the outline; the result is joined to the outline. Returns the new
+    mask, or None when the part clicked does not touch the fish."""
+    d = cv2.distanceTransform(mask.astype(np.uint8), cv2.DIST_L2, 5)
+    cy, cx = np.unravel_index(int(d.argmax()), d.shape)
+    part = segment_fish_click(img, x, y, more=[(cx, cy)])
+    near = cv2.dilate(mask.astype(np.uint8), np.ones((15, 15), np.uint8)) > 0
+    n, lab = cv2.connectedComponents((part & ~mask).astype(np.uint8))
+    keep = np.zeros_like(mask)
+    for i in range(1, n):                       # only pieces that touch the outline (no background islands)
+        piece = lab == i
+        if (piece & near).any():
+            keep |= piece
+    if not keep.any():
+        return None
+    return mask | keep

@@ -8,7 +8,7 @@ FIXED_COLUMNS = [
     'file', 'folder', '{pattern}', 'date_taken', 'camera', 'exposure_s', 'iso', 'focal_mm',
     'colour_chart', 'correction', 'reference_photo', 'chart_error_de00',
     'px_per_mm', 'scale_source', 'parts_included',
-    'standard_length_mm', 'landmarks_source', 'total_length_mm', 'mask_length_mm', 'max_depth_mm',
+    'standard_length_mm', 'landmarks_source', 'total_length_mm', 'total_length_source', 'mask_length_mm', 'max_depth_mm',
     'fish_area_mm2', 'body_area_mm2', '{colori}',
     'label_id', 'label_group', 'label_date', 'label_text', 'label_source',
     'label_confidence', 'label_needs_review', 'analysis',
@@ -91,6 +91,7 @@ def rows(project):
             'standard_length_mm': _num(mm(r.get('standard_length_px')), 2),   # snout to end of the peduncle
             'landmarks_source': r.get('landmarks_source') or 'NA',
             'total_length_mm': _num(mm(r.get('total_length_px')), 2),      # NA when the tail is not all in the mask
+            'total_length_source': r.get('total_length_source') or 'NA',     # outline, or snout -> tail tip landmarks
             'mask_length_mm': _num(mm(r.get('mask_length_px')), 2),
             'max_depth_mm': _num(mm(r.get('max_depth_px')), 2),
             'fish_area_mm2': _num(mm2(r.get('fish_area_px')), 2),

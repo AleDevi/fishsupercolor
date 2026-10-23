@@ -91,6 +91,10 @@ Photos with errors or warnings, most uncertain first. **Accept** (Enter) or **Ex
 found or the outline is wrong, click once on the fish and the outline is redone. The label crop is shown
 with the id read; type the right id and **Save id** (it wins over the reading from then on).
 
+**Transparent fins**: if part of the fish is missing from the outline (often the caudal fin), press **Add to the
+outline** and click on the missing part, close to the fish: that part is joined to the outline (repeat for more
+parts). A click without the button redoes the whole outline.
+
 **Scale**: when the automatic scale is doubtful the whole photo is shown with a red line that should cover 2 cm
 (20 squares). **Confirm scale** if it does; otherwise **Calibrate manually**: zoom in (wheel), click the two ends
 of a known length (2 cm by default, the longer the more precise), type its length in mm, and tick *Use it also for
@@ -181,7 +185,8 @@ colour) and purple (reflection), then **Import strokes from Paint**.
 | `parts_included` | body parts included, e.g. `body+caudal+dorsal` |
 | `standard_length_mm` | SL, snout to end of the caudal peduncle, from the landmarks (`NA` without them) |
 | `landmarks_source` | `manual` (clicked), `model` (landmark model) or `NA` |
-| `total_length_mm` | TL: the outline length when the whole caudal fin is in it, else `NA` (flag `tail_incomplete`) |
+| `total_length_mm` | TL: the outline length when the whole caudal fin is in it; otherwise snout to tail tip from the landmarks; else `NA` (flag `tail_incomplete`) |
+| `total_length_source` | `outline`, `landmarks` or `NA` |
 | `mask_length_mm` | length of the outline along the fish |
 | `max_depth_mm` | maximum body depth |
 | `fish_area_mm2`, `body_area_mm2` | area of the outline; area without the caudal fin |

@@ -32,6 +32,14 @@ if defined FRESH (
 )
 rem No pip cache (saves about 1 GB of disk) and no "new pip version" notice.
 set "PIPOPT=--disable-pip-version-check --no-cache-dir"
+echo.
+if defined FRESH (
+  echo  Downloading and installing the Python packages: about 1.5 GB, 10-20 minutes on a slow connection.
+  echo  The window may stay on the same line for minutes ^(e.g. "Installing collected packages"^): it is working.
+) else (
+  echo  Checking the Python packages: only changed ones are downloaded.
+)
+echo.
 "%VENV%\Scripts\python.exe" -m pip install %PIPOPT% --require-hashes --only-binary=:all: -r "%APP%requirements-win.txt" || goto error
 "%VENV%\Scripts\python.exe" -m pip install %PIPOPT% --no-deps --no-build-isolation --force-reinstall "%APP%." || goto error
 > "%MARK%" echo Installed by install_windows.bat from requirements-win.txt with hash checks.

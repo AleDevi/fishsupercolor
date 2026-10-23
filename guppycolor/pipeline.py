@@ -168,6 +168,12 @@ def date_mismatch(label_date, date_taken):
     return bool(m and e) and (int(m.group(1)), int(m.group(2))) != (int(e.group(3)), int(e.group(2)))
 
 
+def landmarks_tl(points):
+    if 'snout' in points and 'tail_tip' in points:
+        return float(np.hypot(*np.subtract(points['snout'], points['tail_tip'])))
+    return None
+
+
 def find_landmarks(project, photo, img, mask, r):
     """Landmarks clicked by hand (screen 8) win; otherwise the landmark model, if one is chosen. SL from them."""
     from . import landmarks
@@ -388,9 +394,12 @@ def analyse(project, folder, photo, segmenter=None, reference=None, expected_ids
         flags += find_landmarks(project, photo, img, mask, r)
         # with the whole caudal fin in the mask, the mask length is the total length (TL)
         if morph['fin_found']:
-            r['total_length_px'] = r['mask_length_px']
+            r['total_length_px'], r['total_length_source'] = r['mask_length_px'], 'outline'
         else:
             flags.append('tail_incomplete')
+            tl = landmarks_tl(r.get('landmarks') or {})       # snout -> tail tip clicked or predicted
+            if tl:
+                r['total_length_px'], r['total_length_source'] = round(tl, 1), 'landmarks'
         flags += mask_flags(mask, morph)
         r.update(image_quality(img, mask))
         if r['saturated_pct'] > 1:

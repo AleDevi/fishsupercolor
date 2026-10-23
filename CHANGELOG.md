@@ -4,11 +4,22 @@
 - Python 3.13: make rapidocr-onnxruntime optional (no 3.13 release; install fails), installer should `venv --clear`.
 - Fish detector: YOLOE finds no fish on 36/50 white-background photos (Dick 2012-13, datasets/test-100-2026-10-22): add a fallback (background threshold + SAM) or train the detector.
 - Body-part model with its annotation screen.
-- Spectra estimated from the photos, as a separate long CSV.
+- Spectra estimated from the photos, as a separate long CSV (default reference library ['guppy_orange_cw'], per the spectra thread).
 - Scale from a ruler in the photo (not only graph paper).
 - RAW photo support.
 - Verified update from GitHub releases (off while the repository is private).
 - Landmark model export as plain tensors (safetensors/npz) rebuilt locally on import, so a shared file never goes through an unpickler (security review suggestion).
+
+## 0.8.0 (2026-10-23)
+- Review: **Add to the outline**: the next click joins the part clicked (e.g. a transparent caudal fin) to the
+  outline instead of redoing it (SAM prompted with the click and a point inside the fish; only pieces touching
+  the outline are kept).
+- Total length from the landmarks (snout to tail tip) when the caudal fin is not all in the outline; new column
+  `total_length_source` (`outline`, `landmarks`).
+- Caudal fin detection: the peduncle is the narrowest point before the widest part of the fin; a round fin's own
+  tapering edge was taken for it, so open fins were reported as `tail_incomplete` (4 of 11 test photos fixed).
+- Installer says how big and how long the package step is, so a long "Installing collected packages" does
+  not look stuck.
 
 ## 0.7.1 (2026-10-23)
 - Landmark training failed on Windows ("Download failure … Arial.ttf, environment may be offline"): ultralytics

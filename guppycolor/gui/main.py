@@ -690,6 +690,10 @@ class ReviewPage(QWidget):
         row = QHBoxLayout()
         self.b_confirm = QPushButton('Confirm scale (the red line is 2 cm)')
         self.b_confirm.clicked.connect(self.confirm_scale)
+        self.b_add = QPushButton('Add to the outline (then click the missing part, e.g. the tail)')
+        self.b_add.setCheckable(True)
+        self.b_add.setToolTip('The next click on the photo adds that part to the outline instead of redoing it')
+        row.addWidget(self.b_add)
         self.b_cal = QPushButton('Calibrate manually (draw a known length)')
         self.b_cal.clicked.connect(self.start_calibration)
         row.addWidget(self.b_confirm)
@@ -833,7 +837,16 @@ class ReviewPage(QWidget):
         try:
             from ..engine import segment
             img = pipeline.load_image(photo)
-            mask = segment.segment_fish_click(img, x0 + fx * (x1 - x0), y0 + fy * (y1 - y0))
+            X, Y = x0 + fx * (x1 - x0), y0 + fy * (y1 - y0)
+            if self.b_add.isChecked():
+                from .. import training
+                old = training.fish_mask(p, photo)
+                mask = segment.add_to_mask(img, old, X, Y) if old is not None else None
+                self.b_add.setChecked(False)
+                if mask is None:
+                    raise ValueError('nothing next to the outline there: click on the missing part, close to the fish')
+            else:
+                mask = segment.segment_fish_click(img, X, Y)
             areas = [o['fish_area_px'] for o in p.results() if o.get('fish_area_px') and o['path'] != photo]
             if mask is None or not mask.any():
                 raise ValueError('no fish at that point: click in the middle of the body')

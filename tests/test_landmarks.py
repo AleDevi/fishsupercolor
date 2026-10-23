@@ -154,3 +154,46 @@ def test_training_fonts_are_local(tmp_path, monkeypatch):
     monkeypatch.setattr(ultralytics.utils, 'USER_CONFIG_DIR', tmp_path)
     segment.local_fonts()
     assert (tmp_path / 'Arial.ttf').stat().st_size > 100_000 and (tmp_path / 'Arial.Unicode.ttf').exists()
+
+
+def test_fin_with_rounded_edge_is_found():
+    """A round caudal fin narrows again at its edge: the peduncle is before the widest part of the fin."""
+    import cv2
+    import numpy as np
+    from guppycolor.engine import morpho
+    m = np.zeros((600, 1400), np.uint8)
+    cv2.ellipse(m, (500, 300), (330, 90), 0, 0, 360, 1, -1)          # body, head on the left
+    cv2.rectangle(m, (780, 265), (900, 335), 1, -1)                   # caudal peduncle
+    cv2.circle(m, (1010, 300), 150, 1, -1)                            # round fan
+    o = morpho.measure(m.astype(bool), None, head='left')
+    assert o['fin_found'] and o['sl_px'] < 0.75 * o['tl_px']
+
+
+def test_total_length_from_landmarks(photos):
+    from guppycolor import export, landmarks
+    p = analysed(photos)
+    photo = [ph for _, ph in p.photos()][0]
+    r = p.load_result(photo)
+    p.save_result(photo, dict(r, total_length_px=None, total_length_source=None, flags='tail_incomplete'))
+    landmarks.save(p, photo, {'snout': [600.0, 650.0], 'tail_tip': [600.0 + 400, 650.0]})
+    assert p.load_result(photo)['total_length_source'] == 'landmarks'
+    with open(export.write_csv(p), encoding='utf-8') as f:
+        rows = {row['path']: row for row in csv.DictReader(f)}
+    assert rows[photo]['total_length_source'] == 'landmarks'
+    assert abs(float(rows[photo]['total_length_mm']) * float(rows[photo]['px_per_mm']) - 400) < 1
+
+
+def test_add_to_outline(monkeypatch):
+    import numpy as np
+    from guppycolor.engine import segment
+    mask = np.zeros((200, 400), bool)
+    mask[80:120, 50:250] = True
+    fin = np.zeros_like(mask)
+    fin[60:140, 245:330] = True
+    island = np.zeros_like(mask)
+    island[10:20, 10:20] = True
+    monkeypatch.setattr(segment, 'segment_fish_click', lambda img, x, y, more=(): mask | fin | island)
+    new = segment.add_to_mask(np.zeros((200, 400, 3), np.uint8), mask, 300, 100)
+    assert new[100, 300] and new[85, 60] and not new[15, 15]            # fin joined, far island left out
+    monkeypatch.setattr(segment, 'segment_fish_click', lambda img, x, y, more=(): island)
+    assert segment.add_to_mask(np.zeros((200, 400, 3), np.uint8), mask, 15, 15) is None
