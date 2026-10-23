@@ -26,5 +26,6 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           ver="${GITHUB_REF_NAME#v}"
+          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then echo "release already published"; exit 0; fi
           gh release create "$GITHUB_REF_NAME" "GuppyColour_$ver.zip" "GuppyColour_$ver.zip.sha256" \
             --title "Guppy Colour $ver" --notes-file notes.md
