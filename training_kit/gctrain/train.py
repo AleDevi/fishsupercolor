@@ -40,8 +40,17 @@ def plan(m, quick=False):
             'landmarks': dict(epochs=150, imgsz=640, batch=32 if big else 16), 'hard_epochs': 30}
 
 
+def _amp_ok(model=None):
+    """In place of ultralytics' check_amp, which downloads yolo11n.pt (unchecked) to test half precision: cards from
+    the 20xx series on (compute capability 7.5+) do it well, older ones train in full precision."""
+    import torch
+    return torch.cuda.is_available() and torch.cuda.get_device_capability(0) >= (7, 5)
+
+
 def _yolo(weights):
     from ultralytics import YOLO
+    from ultralytics.engine import trainer
+    trainer.check_amp = _amp_ok
     return YOLO(weights)
 
 

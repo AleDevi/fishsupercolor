@@ -111,3 +111,13 @@ def test_package_layout_matches_the_app(tmp_path):
     from guppycolor import modelshare
     manifest, data = modelshare.read_package(dest)
     assert manifest['kind'] == 'landmarks' and json.loads(data['model.json'])['keys'] == ['snout']
+
+
+def test_no_amp_check_download():
+    from gctrain import train
+    from ultralytics.engine import trainer
+    try:
+        train._yolo('yolo11n-pose.yaml')
+    except Exception:
+        pass
+    assert trainer.check_amp is train._amp_ok
