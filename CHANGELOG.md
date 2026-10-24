@@ -17,6 +17,13 @@
 - Verified update from GitHub releases (off while the repository is private).
 - Landmark model export as plain tensors (safetensors/npz) rebuilt locally on import, so a shared file never goes through an unpickler (security review suggestion).
 
+## Unreleased
+- New `training_kit/` (separate from the app, not in its release zip): standalone pre-training on a PC with an
+  NVIDIA card, without Guppy Colour or Claude installed. It places the van der Bijl et al. 2025 annotations (FRDR,
+  CC BY 4.0) on their original photos and trains an outline model (body + caudal fin) and a landmark model (snout,
+  eye, end of the peduncle, tail tip, so SL and TL), checks both on held-out fish against their annotations
+  (`report.html`) and writes model files in the app's export format. See `training_kit/README.md`.
+
 ## 0.10.0 (2026-10-23)
 - **Landmarks win over the outline** (new module `sizes.py`), as soon as they are clicked on screen 8 or predicted:
   - TL = snout -> tail tip whenever the tail tip is marked (`total_length_source = landmarks`), even if the
