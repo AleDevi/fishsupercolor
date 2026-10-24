@@ -8,6 +8,11 @@
 - Python 3.13: make rapidocr-onnxruntime optional (no 3.13 release; install fails), installer should `venv --clear`.
 - Fish detector: YOLOE finds no fish on 36/50 white-background photos (Dick 2012-13, datasets/test-100-2026-10-22): add a fallback (background threshold + SAM) or train the detector.
 - Body-part model with its annotation screen.
+- Pre-trained models from the training kit (`training_kit/`, van der Bijl 2025 photos): import a new model kind
+  `outline` (YOLO11s-seg, classes body and caudal, `models/outline_vN`, same checks as the other models) and use
+  it in the analysis instead of YOLOE+SAM (body and caudal fin masks directly: transparent fins, white
+  backgrounds); landmark training that starts from an imported landmark model instead of `yolo11n-pose.pt`, so
+  the researcher's clicks refine the pre-trained model.
 - Spectra estimated from the photos, as a separate long CSV (default reference library ['guppy_orange_cw'], standard
   colorchecker_simulated_colourworker). Run only when the chart fit uses all 24 patches with error <= 0.1, otherwise
   flag the photo (chart incomplete) and leave its spectra empty; spot masks only inside the fish mask; ~0.3 s/photo.
