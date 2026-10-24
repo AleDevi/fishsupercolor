@@ -88,11 +88,11 @@ for, how it is built, the rules every change must follow, and how to organise th
 
 #### Recent versions (CHANGELOG)
 
-- **Unreleased**: `LLM_PROMPT.md`: a prompt to paste into an AI assistant before working on the repository…
 - **0.10.0 (2026-10-23)**: Landmarks win over the outline (new module `sizes.py`), as soon as they are clicked on…; Review shows each photo in separate views, Fish (outline and measures), Label (the label…; Add to the outline is now a click mode in the Fish view ("A click on the fish: redoes the…
 - **0.9.0 (2026-10-23)**: Results: the table now has `standard_length_mm` and `total_length_mm`; Fixed: on photos with the fish upright (head up or down) the "head on the left/right"…; Training and Landmarks screens: the crop around the fish leaves more room at the head and…
 - **0.8.2 (2026-10-23)**: Fixed: landmark training stopped with "'NoneType' object has no attribute 'write'" when…
 - **0.8.1 (2026-10-23)**: Every screen scrolls when the window is too small for it, instead of cutting the bottom…
+- **0.8.0 (2026-10-23)**: Review: Add to the outline: the next click joins the part clicked (e.g. a transparent…; Total length from the landmarks (snout to tail tip) when the caudal fin is not all in the…; Caudal fin detection: the peduncle is the narrowest point before the widest part of the…; Installer says how big and how long the package step is, so a long "Installing collected…
 
 #### Planned (CHANGELOG)
 
@@ -103,7 +103,10 @@ for, how it is built, the rules every change must follow, and how to organise th
 - Python 3.13: make rapidocr-onnxruntime optional (no 3.13 release; install fails), installer should `venv --clear`.
 - Fish detector: YOLOE finds no fish on 36/50 white-background photos (Dick 2012-13, datasets/test-100-2026-10-22): add a fallback (background threshold + SAM) or train the detector.
 - Body-part model with its annotation screen.
-- Spectra estimated from the photos, as a separate long CSV (default reference library ['guppy_orange_cw'], per the spectra thread).
+- Spectra estimated from the photos, as a separate long CSV (default reference library ['guppy_orange_cw'], standard
+  colorchecker_simulated_colourworker). Run only when the chart fit uses all 24 patches with error <= 0.1, otherwise
+  flag the photo (chart incomplete) and leave its spectra empty; spot masks only inside the fish mask; ~0.3 s/photo.
+  Test report: guppy-tool/spettri/test_spettri_2026-10-24.md.
 - Scale from a ruler in the photo (not only graph paper).
 - RAW photo support.
 - Verified update from GitHub releases (off while the repository is private).
