@@ -3,6 +3,7 @@ annotations: overlap (IoU) of the fish, body and caudal fin; distance of each la
 their standard length; SL and TL from our landmarks against SL and TL from theirs. Optional extra folders of photos
 without annotations (other setups) are only drawn, so a person can judge them by eye."""
 import base64
+import csv
 import glob
 import html
 import json
@@ -84,6 +85,9 @@ def run(work, extra_folders=(), log=print):
     device = om['machine']['device']
     seg, pose = YOLO(om['weights']), YOLO(lm['weights'])
     keys = lm['keys']
+    manual = set()
+    with open(os.path.join(work, 'photos.csv'), newline='', encoding='utf-8') as f:
+        manual = {r['uid'] for r in csv.DictReader(f) if r['manual_landmarks'] == 'TRUE'}
     rows, pics = [], {}
     tests = sorted(glob.glob(os.path.join(work, 'test', '*.json')))
     log(f'Checking the models on {len(tests)} test photos')
@@ -100,7 +104,7 @@ def run(work, extra_folders=(), log=print):
         pts_small = predict_points(pose, keys, img, pred['fish'], lm['imgsz'], device)
         pts = {k: [v[0] / s, v[1] / s] for k, v in pts_small.items()}
         sl_true = _length(tp, SL_FROM, SL_TO)
-        row = {'uid': uid, **{f'iou_{k}': _iou(pred[k], truth[k]) for k in ('fish', 'body', 'caudal')}}
+        row = {'uid': uid, 'manual_landmarks': uid in manual, **{f'iou_{k}': _iou(pred[k], truth[k]) for k in ('fish', 'body', 'caudal')}}
         for k in ('snout', 'eye', 'peduncle_end', 'tail_tip'):
             row[f'err_{k}_pct_sl'] = (100 * _length({'a': pts.get(k), 'b': tp.get(k)}, 'a', 'b') / sl_true
                                       if k in tp and k in pts else float('nan'))
@@ -125,8 +129,10 @@ def run(work, extra_folders=(), log=print):
         f.write(','.join(cols) + '\n')
         for r in rows:
             f.write(','.join('NA' if isinstance(r[c], float) and np.isnan(r[c]) else
-                             (f'{r[c]:.4f}' if isinstance(r[c], float) else str(r[c])) for c in cols) + '\n')
+                             (f'{r[c]:.4f}' if isinstance(r[c], float) else str(r[c]).upper() if isinstance(r[c], bool)
+                              else str(r[c])) for c in cols) + '\n')
     summary = summarise(rows)
+    summary['manual_landmarks_only'] = summarise([r for r in rows if r['manual_landmarks']])
     write_report(os.path.join(work, 'report.html'), summary, rows, pics, extra, om, lm)
     with open(os.path.join(work, 'summary.json'), 'w', encoding='utf-8') as f:
         json.dump(summary, f, indent=1)
@@ -136,7 +142,7 @@ def run(work, extra_folders=(), log=print):
 def summarise(rows):
     out = {'photos': len(rows)}
     for c in (rows[0] if rows else {}):
-        if c == 'uid':
+        if c in ('uid', 'manual_landmarks'):
             continue
         v = np.array([r[c] for r in rows], float)
         v = v[~np.isnan(v)]
@@ -156,15 +162,18 @@ def _fmt(x, pct=False):
 def write_report(path, summary, rows, pics, extra, om, lm):
     worst = sorted(rows, key=lambda r: (np.nan_to_num(r['iou_fish'], nan=-1)))[:12]
     tr = []
+    hand = summary.get('manual_landmarks_only', {})
     for k, label in (('iou_fish', 'Fish outline overlap (IoU)'), ('iou_body', 'Body overlap (IoU)'),
                      ('iou_caudal', 'Caudal fin overlap (IoU)')):
         s = summary.get(k, {})
-        tr.append(f'<tr><td>{label}</td><td>{_fmt(s.get("median"))}</td><td>{_fmt(s.get("p10"))} (worst 10%)</td></tr>')
+        tr.append(f'<tr><td>{label}</td><td>{_fmt(s.get("median"))}</td><td>{_fmt(s.get("p10"))} (worst 10%)</td>'
+                  f'<td>{_fmt(hand.get(k, {}).get("median"))}</td></tr>')
     for k, label in (('err_snout_pct_sl', 'Snout'), ('err_eye_pct_sl', 'Eye'), ('err_peduncle_end_pct_sl', 'End of the peduncle'),
                      ('err_tail_tip_pct_sl', 'Tail tip'), ('sl_err_pct', 'Standard length'), ('tl_err_pct', 'Total length')):
         s = summary.get(k, {})
         tr.append(f'<tr><td>{label}: error as % of SL</td><td>{_fmt(s.get("median_abs"), True)}</td>'
-                  f'<td>{_fmt(s.get("p90_abs"), True)} (90% of fish below)</td></tr>')
+                  f'<td>{_fmt(s.get("p90_abs"), True)} (90% of fish below)</td>'
+                  f'<td>{_fmt(hand.get(k, {}).get("median_abs"), True)}</td></tr>')
     cards = ''.join(f'<figure><img src="data:image/jpeg;base64,{pics[r["uid"]]}"><figcaption>{html.escape(r["uid"])} '
                     f'IoU {r["iou_fish"]:.2f}</figcaption></figure>' for r in worst)
     ex = ''.join(f'<figure><img src="data:image/jpeg;base64,{b}"><figcaption>{html.escape(n)}</figcaption></figure>'
@@ -178,7 +187,9 @@ img{{width:100%}}figcaption{{font-size:12px}}</style></head><body>
 image size {om['imgsz']}; landmark model image size {lm['imgsz']}; machine: {html.escape(str(om['machine'].get('name')))}.</p>
 <p>The reference is the van der Bijl et al. 2025 annotations, mostly made by their own model: the numbers say how close
 we are to them, not how close to perfect.</p>
-<table><tr><th>Measure</th><th>Typical (median)</th><th>Spread</th></tr>{''.join(tr)}</table>
+<p>Last column: only the {hand.get('photos', 0)} test photos whose landmarks van der Bijl placed by hand, the fairest check of
+the landmarks, SL and TL.</p>
+<table><tr><th>Measure</th><th>Typical (median)</th><th>Spread</th><th>Typical, hand-placed landmarks</th></tr>{''.join(tr)}</table>
 <h2>The 12 test photos with the lowest overlap</h2>
 <p>Magenta: our body; orange: our caudal fin; thin green: van der Bijl's fish; red dots: our landmarks.</p>{cards}
 <h2>Other photos (no annotations: judge by eye)</h2>{ex or '<p>None given.</p>'}

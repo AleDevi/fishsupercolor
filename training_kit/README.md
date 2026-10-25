@@ -47,7 +47,8 @@ The zips are read in place: do not unzip them.
    it gets most wrong and trains a little more; it is kept only if it does better on the validation photos.
 3. **Landmark model**: YOLO11n-pose (the same base as the app) on crops made exactly as the app makes them.
 4. **Check** (`gctrain/evaluate.py`) on the test photos: overlap (IoU) of fish, body and caudal fin with
-   theirs; landmark errors, SL and TL errors as % of their SL; the 12 worst photos drawn in `report.html`.
+   theirs; landmark errors, SL and TL errors as % of their SL, also apart for the photos whose landmarks they
+   placed by hand (the fairest check); the 12 worst photos drawn in `report.html`.
    Their annotations are mostly made by their own model: the numbers say how close we are to them.
 5. **Model files** in `results\`, in the layout of Guppy Colour's Export model button.
 
