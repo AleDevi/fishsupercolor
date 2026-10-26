@@ -149,7 +149,6 @@ for, how it is built, the rules every change must follow, and how to organise th
 | `guppycolor/engine/pixels.py` | Colour classes per pixel, ilastik-style: hand-made features (Lab colour smoothed at a few scales, edges, blob filters) + a random forest trained on the user's… |
 | `guppycolor/engine/scale.py` | Pixels per mm from the graph paper around the fish (smallest grid square = 1 mm) |
 | `guppycolor/engine/segment.py` | Zero-training fish segmentation: YOLOE (text prompt 'fish') -> box -> SAM 2.1 mask |
-| `guppycolor/engine/spectra.py` | Optional: reflectance spectra (400-700 nm, 5 nm) estimated from an ordinary RGB photo, the colourWorker method (Osorio, Anderson, Vorobyev, Baddeley |
 | `guppycolor/gui/calibrate.py` | Calibrate manually: the whole photo with zoom (wheel) and pan (right button) |
 | `guppycolor/gui/landmarks_page.py` | Screen 8, Landmarks: click the profile's named landmarks in order on a photo (snout, eye, dorsal base…) |
 | `guppycolor/gui/main.py` | Main window: one screen per step (Project, Settings, Analysis, Review, Results, Pattern and clusters, Training, Landmarks) |
@@ -159,7 +158,7 @@ for, how it is built, the rules every change must follow, and how to organise th
 
 #### Tests
 
-- `test_app.py` (20), `test_gui.py` (5), `test_labels.py` (8), `test_landmarks.py` (17), `test_modelshare.py` (3), `test_outline.py` (5), `test_pattern.py` (8), `test_spectra.py` (5), `test_training.py` (6).
+- `test_app.py` (20), `test_gui.py` (5), `test_labels.py` (8), `test_landmarks.py` (17), `test_modelshare.py` (3), `test_outline.py` (5), `test_pattern.py` (8), `test_training.py` (6).
 
 <!-- AUTO:END -->
 
