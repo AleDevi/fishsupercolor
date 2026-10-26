@@ -21,7 +21,7 @@ def main(argv=None):
     ap.add_argument('--quick', action='store_true', help='a few minutes, only to check that everything runs')
     a = ap.parse_args(argv)
     segment.configure_ultralytics()
-    from . import evaluate, export, prepare, train
+    from . import evaluate, export, prepare, train, vdb
     data = os.path.abspath(a.data)
     work = os.path.join(data, 'work_quick' if a.quick else 'work')
     results = os.path.join(os.path.dirname(data), 'results_quick' if a.quick else 'results')
@@ -36,10 +36,14 @@ def main(argv=None):
     photos = a.photos or os.path.join(data, 'foto_2000')
     if not os.path.isdir(photos):
         log(f'Photo folder not found: {photos}'); return 1
+    ann = vdb.find_annotations(data)
+    if ann is None:
+        log('The van der Bijl files were not found in ' + data + ' (nor in its subfolders): photo_database.csv, '
+            + ', '.join(vdb.ZIPS.values()) + '. Copy them there, without unzipping them.'); return 1
     extra = a.extra or [d for d in (os.path.join(data, 'other_photos'),) if os.path.isdir(d)]
     if not os.path.exists(os.path.join(work, 'photos.csv')):
         log('Step 1 of 4: preparing the photos')
-        prepare.run(data, photos, work, log=log, limit=60 if a.quick else None)
+        prepare.run(ann, photos, work, log=log, limit=60 if a.quick else None)
     else:
         log('Step 1 of 4: photos already prepared')
     log('Step 2 of 4: outline model')

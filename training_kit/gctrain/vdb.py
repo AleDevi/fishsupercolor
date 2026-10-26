@@ -20,6 +20,19 @@ MIN_INLIERS = 15
 MAX_DIFF = 30                # mean grey-level difference crop vs photo under the mask; above it the match is wrong
 
 
+def find_annotations(folder, depth=3):
+    """The folder (folder itself or one of its subfolders) that holds photo_database.csv and the annotation zips,
+    or None. The photos and the work folders are not searched."""
+    need = ['photo_database.csv'] + list(ZIPS.values())
+    base = folder.rstrip(os.sep).count(os.sep)
+    for root, dirs, files in os.walk(folder):
+        if all(n in files for n in need):
+            return root
+        dirs[:] = [] if root.count(os.sep) - base >= depth else \
+            [d for d in dirs if not d.lower().startswith(('work', 'foto', 'results', 'other_photos'))]
+    return None
+
+
 def uid_of(photo_name):
     """'20200818-IMG_2877.JPG' -> '20200818_IMG_2877' (their unique_id)."""
     return os.path.splitext(os.path.basename(photo_name))[0].replace('-', '_')

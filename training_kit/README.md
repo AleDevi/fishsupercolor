@@ -33,7 +33,8 @@ GuppyTraining\
     other_photos\           optional: photos of other setups, only drawn in the report
 ```
 
-The zips are read in place: do not unzip them.
+The zips are read in place: do not unzip them. They may also sit in a subfolder of `data` (e.g. a copy of the whole
+van der Bijl folder). Unzip the kit itself to `C:\`: it makes the folder `C:\GuppyTraining`.
 
 ## What `start_training.bat` does
 

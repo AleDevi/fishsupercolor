@@ -121,3 +121,13 @@ def test_no_amp_check_download():
     except Exception:
         pass
     assert trainer.check_amp is train._amp_ok
+
+
+def test_find_annotations_in_a_subfolder(tmp_path):
+    sub = tmp_path / 'van der Bijl_annotations'
+    sub.mkdir()
+    (tmp_path / 'foto_2000').mkdir()
+    assert vdb.find_annotations(str(tmp_path)) is None
+    for n in ['photo_database.csv'] + list(vdb.ZIPS.values()):
+        (sub / n).write_bytes(b'')
+    assert vdb.find_annotations(str(tmp_path)) == str(sub)
