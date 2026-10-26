@@ -35,6 +35,7 @@ DEFAULT_SETTINGS = {
     'analysis': {'default': 'size_colour', 'size_only_folders': [], 'size_only_pattern': ''},
     'training': {'annotator': ''},
     'landmarks': {'model': ''},     # YOLO-pose model trained in screen 8 ('' = only landmarks clicked by hand)
+    'outline': {'model': ''},       # imported outline model (outline_vN); '' = zero-training detector (YOLOE + SAM)
 }
 
 # Settings that change the numbers: a change makes earlier results stale.
@@ -121,6 +122,8 @@ class Project:
 
     def settings_hash(self):
         s = {k: self.settings[k] for k in ANALYSIS_KEYS}
+        if self.settings['outline'].get('model'):      # only then, so projects made before it stay current
+            s['outline'] = self.settings['outline']
         return hashlib.sha1(json.dumps(s, sort_keys=True).encode('utf-8')).hexdigest()[:12]
 
     def result_path(self, photo):

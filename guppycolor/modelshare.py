@@ -1,7 +1,8 @@
 """Export a trained model to one .zip file and import it into another project (or another computer).
 
 Colour models: model.npz (plain arrays, read without pickle) + model.json. Landmark models: best.pt (YOLO-pose
-weights, opened weights-only) + model.json. manifest.json says the kind and the SHA-256 of each file. Import reads
+weights, opened weights-only) + model.json. Outline models: best.pt (YOLO segmentation weights of the fish parts,
+e.g. from the training kit) + model.json. manifest.json says the kind and the SHA-256 of each file. Import reads
 only these fixed names, checks sizes and hashes, checks that the model fits the project's species profile, and saves
 it as the next version (colours_vN / landmarks_vN) with where it came from."""
 import datetime
@@ -13,11 +14,13 @@ import zipfile
 
 import numpy as np
 
-from . import __version__, landmarks, profile, training
+from . import __version__, landmarks, outline, profile, training
 from .engine import pixels
 
 MAX_BYTES = {'manifest.json': 1 << 20, 'model.json': 1 << 20, 'model.npz': 300 << 20, 'best.pt': 300 << 20}
-FILES = {'colours': ('model.npz', 'model.json'), 'landmarks': ('best.pt', 'model.json')}
+FILES = {'colours': ('model.npz', 'model.json'), 'landmarks': ('best.pt', 'model.json'),
+         'outline': ('best.pt', 'model.json')}
+WEIGHTS = {'landmarks': landmarks.model_weights, 'outline': outline.model_weights}
 
 
 def _sha(data):
@@ -25,7 +28,10 @@ def _sha(data):
 
 
 def kind_of(name):
-    return 'landmarks' if name.startswith('landmarks_') else 'colours'
+    for kind in ('landmarks', 'outline'):
+        if name.startswith(kind + '_'):
+            return kind
+    return 'colours'
 
 
 def export_model(project, name, dest):
@@ -37,7 +43,7 @@ def export_model(project, name, dest):
     if kind == 'colours':
         weights = os.path.join(models, name + '.npz')
     else:
-        weights = landmarks.model_weights(project, name)
+        weights = WEIGHTS[kind](project, name)
     with open(weights, 'rb') as f:
         w = f.read()
     meta_p = os.path.join(models, name + '.json')
@@ -45,7 +51,7 @@ def export_model(project, name, dest):
     if os.path.exists(meta_p):
         with open(meta_p, encoding='utf-8') as f:
             meta = json.load(f)
-    if kind == 'landmarks' and _sha(w) != meta.get('sha256'):
+    if kind != 'colours' and _sha(w) != meta.get('sha256'):
         raise ValueError(f'{name}: the model file differs from the one trained, not exported')
     m = json.dumps(meta, indent=1, ensure_ascii=False).encode('utf-8')
     wname = FILES[kind][0]
@@ -107,13 +113,22 @@ def import_model(project, path):
         forest.meta.update(name=name, imported_from=origin)
         forest.save(os.path.join(models, name + '.npz'))
         return name, forest.meta
-    keys = [l['key'] for l in landmarks.landmark_list(prof)]
-    if meta.get('keys') != keys:
-        raise ValueError('the landmarks of this model (' + ', '.join(map(str, meta.get('keys') or [])) + ') differ '
-                         'from the ones of this project (' + ', '.join(keys) + ')')
-    nums = [int(n.rsplit('_v', 1)[1]) for n, _ in landmarks.list_models(project)]
-    name = f'landmarks_v{max(nums, default=0) + 1}'
-    w = landmarks.model_weights(project, name)
+    if kind == 'landmarks':
+        keys = [l['key'] for l in landmarks.landmark_list(prof)]
+        if meta.get('keys') != keys:
+            raise ValueError('the landmarks of this model (' + ', '.join(map(str, meta.get('keys') or [])) + ') differ '
+                             'from the ones of this project (' + ', '.join(keys) + ')')
+        existing = landmarks.list_models(project)
+    else:
+        parts = [p['key'] for p in prof.get('parts', [])]
+        classes = meta.get('classes')
+        if not isinstance(classes, list) or 'body' not in classes or not set(classes) <= set(parts):
+            raise ValueError('the parts of this outline model (' + ', '.join(map(str, classes or [])) + ') are not '
+                             'body parts of this project (' + ', '.join(parts) + ')')
+        existing = outline.list_models(project)
+    nums = [int(n.rsplit('_v', 1)[1]) for n, _ in existing]
+    name = f'{kind}_v{max(nums, default=0) + 1}'
+    w = WEIGHTS[kind](project, name)
     os.makedirs(os.path.dirname(w), exist_ok=True)
     with open(w, 'wb') as f:
         f.write(data['best.pt'])

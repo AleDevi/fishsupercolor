@@ -96,13 +96,14 @@ class TrainWorker(QObject):
     failed = Signal(str)
     progress = Signal(int, int, str)
 
-    def __init__(self, project):
+    def __init__(self, project, start_from=None):
         super().__init__()
         self.project = project
+        self.start_from = start_from
 
     def run(self):
         try:
-            self.done.emit(*landmarks.train(self.project, progress=self.progress.emit))
+            self.done.emit(*landmarks.train(self.project, progress=self.progress.emit, start_from=self.start_from))
         except Exception as e:
             self.failed.emit(f'{type(e).__name__}: {e}')
 
@@ -156,6 +157,12 @@ class LandmarksPage(QWidget):
             sc.activated.connect(fn)
         mbox = QGroupBox('Landmark model')
         ml = QVBoxLayout(mbox)
+        f = QFormLayout()
+        self.start_from = QComboBox()
+        self.start_from.setToolTip('Ritocco: start from a model already trained on many photos (e.g. the imported van '
+                                   'der Bijl one) and refine it with your clicks; faster and better with few photos.')
+        f.addRow('Start from', self.start_from)
+        ml.addLayout(f)
         self.b_train = QPushButton('Train')
         self.b_train.clicked.connect(self.train)
         ml.addWidget(self.b_train)
@@ -286,6 +293,14 @@ class LandmarksPage(QWidget):
         cur = self.project.settings['landmarks'].get('model', '')
         self.model.setCurrentIndex(max(0, self.model.findData(cur)))
         self.model_info.setText('Clicked landmarks always win over the model.')
+        self.start_from.clear()
+        self.start_from.addItem('a general model (yolo11n-pose, from scratch)', '')
+        models = landmarks.list_models(self.project)
+        for name, meta in reversed(models):
+            src = 'imported' if meta.get('imported_from') else f"{meta.get('photos', 0)} photos"
+            self.start_from.addItem(f'{name} ({src}): Ritocco', name)
+        imported = [n for n, m in models if m.get('imported_from')]      # pre-trained models are the best start
+        self.start_from.setCurrentIndex(max(0, self.start_from.findData(imported[-1])) if imported else 0)
 
     def use_model(self, i):
         self.project.settings['landmarks']['model'] = self.model.itemData(i)
@@ -294,7 +309,7 @@ class LandmarksPage(QWidget):
     def train(self):
         self.b_train.setEnabled(False)
         self.b_train.setText('Training… (minutes on a GPU, longer on a CPU)')
-        self.worker = TrainWorker(self.project)
+        self.worker = TrainWorker(self.project, self.start_from.currentData() or None)
         self.thread = QThread()
         self.worker.moveToThread(self.thread)
         self.thread.started.connect(self.worker.run)

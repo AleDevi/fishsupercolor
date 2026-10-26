@@ -8,8 +8,8 @@ import numpy as np
 from PySide6.QtCore import QObject, QSettings, Qt, QThread, QUrl, Signal
 from PySide6.QtGui import QColor, QDesktopServices, QIcon, QImageReader, QPainter, QPen, QPixmap
 from PySide6.QtWidgets import (
-    QApplication, QButtonGroup, QCheckBox, QDoubleSpinBox, QFileDialog, QFormLayout, QGroupBox, QHBoxLayout,
-    QHeaderView, QInputDialog, QLabel, QLineEdit, QListWidget, QListWidgetItem, QMainWindow, QMessageBox,
+    QApplication, QButtonGroup, QCheckBox, QComboBox, QDoubleSpinBox, QFileDialog, QFormLayout, QGroupBox,
+    QHBoxLayout, QHeaderView, QInputDialog, QLabel, QLineEdit, QListWidget, QListWidgetItem, QMainWindow, QMessageBox,
     QFrame, QProgressBar, QPushButton, QRadioButton, QScrollArea, QSizePolicy, QSplitter, QStackedWidget,
     QTabBar, QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget,
 )
@@ -41,6 +41,10 @@ FLAG_LABEL = {
     'blurry': 'much less sharp than the other photos of the session',
     'sl_landmarks_missing': 'snout or end of the caudal peduncle not marked: no standard length',
     'landmark_model_error': 'the landmark model could not be used (file changed or missing)',
+    'outline_model_missed': 'the outline model found no fish: the automatic detector drew the outline',
+    'outline_model_rejected': 'the outline of the outline model looked wrong (border, pieces or shape): the '
+                              'automatic detector drew a better one',
+    'outline_model_error': 'the outline model could not be used (file changed or missing): automatic detector used',
 }
 
 
@@ -242,6 +246,24 @@ class SettingsPage(QWidget):
         row.addStretch()
         gl.addLayout(row)
         lay.addWidget(g)
+        g = QGroupBox('Fish outline')
+        gl = QVBoxLayout(g)
+        row = QHBoxLayout()
+        self.outline_model = QComboBox()
+        self.outline_model.currentIndexChanged.connect(self.changed)
+        row.addWidget(self.outline_model, 1)
+        b = QPushButton('Import outline model…')
+        b.clicked.connect(self.import_outline)
+        row.addWidget(b)
+        b = QPushButton('Export…')
+        b.clicked.connect(self.export_outline)
+        row.addWidget(b)
+        gl.addLayout(row)
+        gl.addWidget(note('Automatic: a general detector finds any fish, no training needed. An outline model (e.g. '
+                          'the one pre-trained on the van der Bijl 2025 guppy photos) draws the body and the tail '
+                          'fin separately; where it finds no fish the automatic one is used. Changing it means '
+                          'running the Analysis again.'))
+        lay.addWidget(g)
         g = QGroupBox('Head of the fish in the photos')
         gl = QHBoxLayout(g)
         self.head = QButtonGroup(self)
@@ -361,6 +383,7 @@ class SettingsPage(QWidget):
         for b in self.an_default.buttons():
             b.setChecked(b.property('key') == st['analysis'].get('default', 'size_colour'))
         self.size_only.setText(st['analysis'].get('size_only_pattern', ''))
+        self.fill_outline_models(p)
         for k, e in self.lab_fields.items():
             e.setText(st['labels'].get(k, ''))
         self.loading = False
@@ -392,6 +415,38 @@ class SettingsPage(QWidget):
         else:
             self.example.setText('The parts in braces become CSV columns. Name one {id} to use it as the fish id.')
 
+    def fill_outline_models(self, p):
+        from .. import outline
+        loading, self.loading = self.loading, True
+        self.outline_model.clear()
+        self.outline_model.addItem('Automatic (YOLOE + SAM 2.1)', '')
+        for name, meta in outline.list_models(p):
+            src = (meta.get('imported_from') or {}).get('project') or meta.get('source') or ''
+            self.outline_model.addItem(f"{name}: {', '.join(meta.get('classes') or [])}"
+                                       + (f' ({src[:60]})' if src else ''), name)
+        i = self.outline_model.findData(p.settings['outline'].get('model', ''))
+        self.outline_model.setCurrentIndex(max(i, 0))
+        self.loading = loading
+
+    def import_outline(self):
+        if self.win.project is None:
+            return
+        from .modelfiles import import_dialog
+        name = import_dialog(self, self.win.project, 'outline')
+        if name:
+            self.win.project.settings['outline']['model'] = name
+            self.win.project.save()
+            self.fill_outline_models(self.win.project)
+
+    def export_outline(self):
+        name = self.outline_model.currentData()
+        if self.win.project is None or not name:
+            QMessageBox.information(self, 'Export', 'Choose an outline model first (the automatic one has nothing '
+                                    'to export).')
+            return
+        from .modelfiles import export_dialog
+        export_dialog(self, self.win.project, name)
+
     def measure_scale(self):
         folders = self.win.project.folders if self.win.project else []
         path, _ = QFileDialog.getOpenFileName(self, 'Photo with a ruler or graph paper', folders[0] if folders else '',
@@ -418,6 +473,7 @@ class SettingsPage(QWidget):
         st['scale']['px_per_mm'] = self.ppm.value() or None
         st['head'] = self.head.checkedButton().property('key') if self.head.checkedButton() else 'left'
         st['parts'] = {k: c.isChecked() for k, c in self.parts.items()}
+        st['outline']['model'] = self.outline_model.currentData() or ''
         st['filename_pattern'] = self.pattern.text().strip()
         st['labels']['id_source'] = self.id_src.checkedButton().property('key') if self.id_src.checkedButton() else 'none'
         st['labels']['read_label'] = self.read_label.isChecked()

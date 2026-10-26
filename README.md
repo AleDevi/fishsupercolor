@@ -65,6 +65,14 @@ analysis at the next Start.
     imported as a CSV from the ImageJ plugin (`Patch,Name,R,G,B`, 0–255).
   - *Single calibration*: the transform measured on the reference photo is applied to every photo, also to photos without a chart.
   Photos without a chart are measured uncorrected and flagged `no_chart`.
+- **Fish outline**: *Automatic* (YOLOE + SAM 2.1, no training, works on any fish) or an imported **outline
+  model** (**Import outline model…**), e.g. `outline_vanderbijl.zip` from the training kit, pre-trained on the van
+  der Bijl 2025 guppy photos. An outline model draws the body and the tail fin separately: the body area and
+  whether the fin is in the outline then come from it. Where it finds no fish, or its outline is in pieces, cut by
+  the border or oddly shaped, the automatic detector is used for that photo (flags `outline_model_missed`,
+  `outline_model_rejected`). The CSV column `outline_source` says which drew each outline. On photos unlike the
+  ones it was trained on (graph paper with closed fins, dark or tight framing) the automatic one can be better:
+  try both on a few photos.
 - **Scale**: automatic from the graph paper (smallest square = 1 mm, measured over at least 20 squares = 2 cm),
   by hand (a known length drawn on the photo in Review), a fixed px/mm value (**Measure on a photo…** draws it on
   one photo), or none (pixels). A doubtful automatic scale goes to Review and, until it is confirmed, the CSV uses
@@ -183,8 +191,13 @@ colour) and purple (reflection), then **Import strokes from Paint**.
    **Backspace** undoes, **N** goes to the next photo. Mouse wheel zooms, right button drags. Clicks are saved
    at once and the **standard length** (snout to end of the caudal peduncle) goes into the results straight
    away: no new analysis needed.
-3. With 10–30 photos clicked, **Train** makes a landmark model (YOLO-pose, `models/landmarks_vN`). It starts
-   from the small public `yolo11n-pose.pt` weights (downloaded once and checked against their SHA-256). A GPU
+3. With 10–30 photos clicked, **Train** makes a landmark model (YOLO-pose, `models/landmarks_vN`). **Start from**
+   chooses where it starts: the small public `yolo11n-pose.pt` weights (downloaded once and checked against their
+   SHA-256), or **Ritocco**: a landmark model of the project, e.g. `landmarks_vanderbijl.zip` from the training kit
+   (pre-trained on about 1,600 van der Bijl 2025 photos), imported with **Import model…**. Ritocco refines it with
+   your clicks in fewer rounds and with gentle steps, so a few photos adapt it to your setup without undoing what
+   it learnt. Landmarks a model was never trained on (the kit's has no dorsal fin base and gonopodium base) are
+   not predicted until you click them on some photos and train again. A GPU
    takes minutes, a CPU much longer. The new model is put in use; run the **Analysis** again to get SL (and
    the landmarks) on every fish. Landmarks the model is unsure of (confidence < 0.5) are left out.
    A bar shows the training rounds; it may stop before the last one when the model no longer improves.
@@ -218,6 +231,7 @@ colour) and purple (reflection), then **Import strokes from Paint**.
 | `max_depth_mm`, `depth_source` | maximum body depth: across the body at the gonopodium base (`landmarks`) or widest point of the outline (`outline`) |
 | `fish_area_mm2`, `body_area_mm2`, `body_area_source` | area of the outline; area without the caudal fin, cut at the peduncle landmark (`landmarks`) or where the outline narrows (`outline`) |
 | `caudal_area_mm2` | outline after the peduncle landmark, only when the tail fin is in the outline |
+| `outline_source` | what drew the outline: `detector` (automatic), `manual` (redone in Review) or the outline model (`outline_vN`) |
 | `area_<class>_mm2` | area of each colour class (with a colour model) |
 | `pct_<class>` | % of the fish area (reflections left out) |
 | `n_spots_<class>` | number of separate spots |
@@ -260,6 +274,9 @@ In R, the spots of one class: `strsplit(d$spots_orange_mm2, ";")`.
 | `blurry` | sharpness below 40% of the session median | |
 | `sl_landmarks_missing` | landmarks present but snout or end of the peduncle missing: no SL | |
 | `landmark_model_error` | the landmark model file changed or is missing: not used | |
+| `outline_model_missed` | the outline model found no fish: the automatic detector drew the outline | |
+| `outline_model_rejected` | the outline model's outline looked wrong (border, pieces, shape): the automatic detector's was better | |
+| `outline_model_error` | the outline model file changed or is missing: automatic detector used | |
 
 ## Project folder
 
@@ -268,7 +285,8 @@ In R, the spots of one class: `strsplit(d$spots_orange_mm2, ";")`.
   project.json            settings and photo folders
   colour_reference.csv    colour reference (Patch,Name,R,G,B)
   results/<photo>.json    everything measured on each photo (pixels)
-  masks/<photo>.png       fish outline; <photo>_manual.png = outline redone in Review
+  masks/<photo>.png       fish outline; <photo>_manual.png = outline redone in Review; <photo>_<part>.png =
+                          parts drawn by an outline model (e.g. caudal)
   check/<photo>.jpg       outline and measures drawn on the fish; <photo>_colours.jpg = colour classes
   training/strokes/       painted strokes (one PNG per photo, value = brush number)
   training/images/        colour-corrected photos used for training (cache)
@@ -276,6 +294,7 @@ In R, the spots of one class: `strsplit(d$spots_orange_mm2, ";")`.
   scale/<photo>.json      line drawn by hand (ends in photo pixels, mm); scale/folders.json = px/mm per folder
   landmarks/<photo>.json  landmarks clicked by hand (photo pixels, annotator, date)
   models/landmarks_vN/    landmark models (+ landmarks_vN.json with landmarks, photos, SHA-256 of the weights)
+  models/outline_vN/      imported outline models (+ outline_vN.json with parts, source, SHA-256 of the weights)
   training/landmarks_dataset/  crops and labels made for the last landmark training
   export/                 measurements.csv, validation_*.csv/png
 ```

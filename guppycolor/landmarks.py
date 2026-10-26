@@ -154,8 +154,10 @@ def pipeline_mask(project, photo):
     return fish_mask(project, photo)
 
 
-def train(project, epochs=150, imgsz=640, progress=None):
-    """Train a YOLO-pose model on the clicked landmarks. GPU used when present. Returns (name, meta)."""
+def train(project, epochs=150, imgsz=640, progress=None, start_from=None):
+    """Train a YOLO-pose model on the clicked landmarks. GPU used when present. Returns (name, meta).
+    start_from: a landmark model of the project (e.g. one pre-trained on many photos and imported) that the clicks
+    refine ("Ritocco") instead of starting from the general yolo11n-pose: fewer rounds, its image size."""
     from .engine import segment
     import hashlib
     prof = profile.load(project.settings['profile'])
@@ -165,7 +167,19 @@ def train(project, epochs=150, imgsz=640, progress=None):
     yaml, n = build_dataset(project, os.path.join(project.dir('training'), 'landmarks_dataset'), keys)
     if n < 2:
         raise ValueError('Click the landmarks on at least a few photos first (10–30 are a good start).')
-    base = segment.ensure_file(BASE, BASE_SHA256)
+    clicked = {k for _, pts in annotated(project) for k in pts}
+    untrained = set()
+    if start_from:
+        _, _, base_meta = load_model(project, start_from)      # checks its SHA-256 too
+        if base_meta.get('keys') != keys:
+            raise ValueError(f'{start_from} has other landmarks than this project')
+        base = model_weights(project, start_from)
+        imgsz = int(base_meta.get('imgsz', imgsz))
+        epochs = min(epochs, 60)
+        untrained = set(base_meta.get('not_trained') or [])
+    else:
+        base = segment.ensure_file(BASE, BASE_SHA256)
+        untrained = set(keys)
     segment.configure_ultralytics()
     from ultralytics import YOLO
     import torch
@@ -175,13 +189,22 @@ def train(project, epochs=150, imgsz=640, progress=None):
     if progress:
         model.add_callback('on_train_epoch_end', lambda tr: progress(
             tr.epoch + 1, epochs, f'Round {tr.epoch + 1} of {epochs} (it may stop earlier when it no longer improves)'))
+    # Ritocco: gentle steps and the backbone kept, so a few photos refine the pre-trained model instead of undoing it
+    # (nbs = batch: a step after every batch; by default ultralytics waits for 64 images, more than a few photos)
+    gentle = dict(optimizer='AdamW', lr0=0.0005, warmup_epochs=0, freeze=10, nbs=8, patience=20) if start_from else \
+        dict(patience=40)
     model.train(data=yaml, epochs=epochs, imgsz=imgsz, batch=8, workers=0, fliplr=0.0, mosaic=0.0, amp=False,
-                     device=0 if torch.cuda.is_available() else 'cpu', project=project.dir('models'), name=name,
-                     exist_ok=True, plots=False, verbose=False, patience=40)
+                device=0 if torch.cuda.is_available() else 'cpu', project=project.dir('models'), name=name,
+                exist_ok=True, plots=False, verbose=False, **gentle)
     w = model_weights(project, name)
+    with open(w, 'rb') as f:
+        sha = hashlib.sha256(f.read()).hexdigest()
     meta = {'name': name, 'date': datetime.datetime.now().isoformat(timespec='minutes'),
             'annotator': project.settings.get('training', {}).get('annotator', ''), 'keys': keys, 'photos': n,
-            'gpu': torch.cuda.is_available(), 'sha256': hashlib.sha256(open(w, 'rb').read()).hexdigest()}
+            'gpu': torch.cuda.is_available(), 'sha256': sha, 'imgsz': imgsz,
+            'not_trained': [k for k in keys if k in untrained and k not in clicked]}
+    if start_from:
+        meta['started_from'] = start_from
     with open(os.path.join(project.dir('models'), name + '.json'), 'w', encoding='utf-8') as f:
         json.dump(meta, f, indent=1)
     return name, meta
@@ -200,19 +223,20 @@ def load_model(project, name):
         segment.configure_ultralytics()
         from ultralytics import YOLO
         _cache.clear()
-        _cache[key] = (YOLO(w), meta.get('keys', []))
+        skip = set(meta.get('not_trained') or [])       # keys the model never saw (e.g. the training kit's)
+        _cache[key] = (YOLO(w), [k if k not in skip else None for k in meta.get('keys', [])], meta)
     return _cache[key]
 
 
 def predict(project, name, img, mask):
     """{key: [x, y]} in photo pixels for landmarks predicted with confidence >= MIN_CONF."""
-    model, keys = load_model(project, name)
+    model, keys, meta = load_model(project, name)
     x0, y0, x1, y1 = crop_box(mask, img.shape)
-    r = model.predict(img[y0:y1, x0:x1, ::-1], verbose=False, conf=0.1)[0]
+    r = model.predict(img[y0:y1, x0:x1, ::-1], imgsz=int(meta.get('imgsz', 640)), verbose=False, conf=0.1)[0]
     if r.keypoints is None or len(r.boxes) == 0:
         return {}
     i = int(r.boxes.conf.argmax())
     xy = r.keypoints.xy[i].cpu().numpy()
     conf = r.keypoints.conf[i].cpu().numpy() if r.keypoints.conf is not None else np.ones(len(keys))
     return {k: [float(xy[j, 0] + x0), float(xy[j, 1] + y0)] for j, k in enumerate(keys)
-            if j < len(xy) and conf[j] >= MIN_CONF}
+            if k and j < len(xy) and conf[j] >= MIN_CONF}

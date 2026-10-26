@@ -82,17 +82,17 @@ for, how it is built, the rules every change must follow, and how to organise th
 
 ### Current state (generated)
 
-- Version: **0.10.0** (`guppycolor/__init__.py` and `pyproject.toml`).
+- Version: **0.11.0** (`guppycolor/__init__.py` and `pyproject.toml`).
 - Target Python: **3.12** on Windows (tests and installer). Pinned in `requirements.in`: `ultralytics==8.4.183`.
 - App screens (README, Workflow): 1 Project; 2 Settings; 3 Analysis; 4 Review; 5 Results; 6 Pattern and clusters; 7 Training (colour classes); 8 Landmarks.
 
 #### Recent versions (CHANGELOG)
 
+- **0.11.0 (2026-10-26)**: Outline models: Settings > Fish outline can use an imported outline model instead of the…; Ritocco: Landmarks > Start from: training can start from a landmark model of the project…; Landmark models can say which landmarks they were never trained on (the training kit's…; Export / Import model works for outline models too.
 - **0.10.0 (2026-10-23)**: Landmarks win over the outline (new module `sizes.py`), as soon as they are clicked on…; Review shows each photo in separate views, Fish (outline and measures), Label (the label…; Add to the outline is now a click mode in the Fish view ("A click on the fish: redoes the…
 - **0.9.0 (2026-10-23)**: Results: the table now has `standard_length_mm` and `total_length_mm`; Fixed: on photos with the fish upright (head up or down) the "head on the left/right"…; Training and Landmarks screens: the crop around the fish leaves more room at the head and…
 - **0.8.2 (2026-10-23)**: Fixed: landmark training stopped with "'NoneType' object has no attribute 'write'" when…
 - **0.8.1 (2026-10-23)**: Every screen scrolls when the window is too small for it, instead of cutting the bottom…
-- **0.8.0 (2026-10-23)**: Review: Add to the outline: the next click joins the part clicked (e.g. a transparent…; Total length from the landmarks (snout to tail tip) when the caudal fin is not all in the…; Caudal fin detection: the peduncle is the narrowest point before the widest part of the…; Installer says how big and how long the package step is, so a long "Installing collected…
 
 #### Planned (CHANGELOG)
 
@@ -103,11 +103,8 @@ for, how it is built, the rules every change must follow, and how to organise th
 - Python 3.13: make rapidocr-onnxruntime optional (no 3.13 release; install fails), installer should `venv --clear`.
 - Fish detector: YOLOE finds no fish on 36/50 white-background photos (Dick 2012-13, datasets/test-100-2026-10-22): add a fallback (background threshold + SAM) or train the detector.
 - Body-part model with its annotation screen.
-- Pre-trained models from the training kit (`training_kit/`, van der Bijl 2025 photos): import a new model kind
-  `outline` (YOLO11s-seg, classes body and caudal, `models/outline_vN`, same checks as the other models) and use
-  it in the analysis instead of YOLOE+SAM (body and caudal fin masks directly: transparent fins, white
-  backgrounds); landmark training that starts from an imported landmark model instead of `yolo11n-pose.pt`, so
-  the researcher's clicks refine the pre-trained model.
+- Ritocco for outline models (needs outlines split into body and caudal fin on the researcher's photos) and
+  mixing a few van der Bijl photos into in-app training, as the training kit suggests.
 - Spectra estimated from the photos, as a separate long CSV (default reference library ['guppy_orange_cw'], standard
   colorchecker_simulated_colourworker). Run only when the chart fit uses all 24 patches with error <= 0.1, otherwise
   flag the photo (chart incomplete) and leave its spectra empty; spot masks only inside the fish mask; ~0.3 s/photo.
@@ -135,6 +132,7 @@ for, how it is built, the rules every change must follow, and how to organise th
 | `guppycolor/landmarks.py` | Named landmarks (from the species profile): clicked by hand in screen 8, or predicted by a YOLO-pose model trained on those clicks |
 | `guppycolor/metadata.py` | Photo metadata: fields parsed from the file name with a user pattern, plus EXIF |
 | `guppycolor/modelshare.py` | Export a trained model to one .zip file and import it into another project (or another computer) |
+| `guppycolor/outline.py` | Outline models: a YOLO segmentation model that draws the parts of the fish (e.g. body and caudal fin) on the whole photo, imported as a .zip (Export model /… |
 | `guppycolor/pattern.py` | Pattern and clusters (screen 6): every analysed fish with a colour map is aligned on the mean shape (engine/pattern.py), described as per-pixel colour maps and… |
 | `guppycolor/pipeline.py` | Analysis of one photo: colour correction -> fish mask -> scale -> measures -> quality flags |
 | `guppycolor/profile.py` | Species profile: body parts, colour classes and named landmarks |
@@ -151,6 +149,7 @@ for, how it is built, the rules every change must follow, and how to organise th
 | `guppycolor/engine/pixels.py` | Colour classes per pixel, ilastik-style: hand-made features (Lab colour smoothed at a few scales, edges, blob filters) + a random forest trained on the user's… |
 | `guppycolor/engine/scale.py` | Pixels per mm from the graph paper around the fish (smallest grid square = 1 mm) |
 | `guppycolor/engine/segment.py` | Zero-training fish segmentation: YOLOE (text prompt 'fish') -> box -> SAM 2.1 mask |
+| `guppycolor/engine/spectra.py` | Optional: reflectance spectra (400-700 nm, 5 nm) estimated from an ordinary RGB photo, the colourWorker method (Osorio, Anderson, Vorobyev, Baddeley |
 | `guppycolor/gui/calibrate.py` | Calibrate manually: the whole photo with zoom (wheel) and pan (right button) |
 | `guppycolor/gui/landmarks_page.py` | Screen 8, Landmarks: click the profile's named landmarks in order on a photo (snout, eye, dorsal base…) |
 | `guppycolor/gui/main.py` | Main window: one screen per step (Project, Settings, Analysis, Review, Results, Pattern and clusters, Training, Landmarks) |
@@ -160,7 +159,7 @@ for, how it is built, the rules every change must follow, and how to organise th
 
 #### Tests
 
-- `test_app.py` (20), `test_gui.py` (5), `test_labels.py` (8), `test_landmarks.py` (17), `test_modelshare.py` (3), `test_pattern.py` (8), `test_training.py` (6).
+- `test_app.py` (20), `test_gui.py` (5), `test_labels.py` (8), `test_landmarks.py` (17), `test_modelshare.py` (3), `test_outline.py` (5), `test_pattern.py` (8), `test_spectra.py` (5), `test_training.py` (6).
 
 <!-- AUTO:END -->
 

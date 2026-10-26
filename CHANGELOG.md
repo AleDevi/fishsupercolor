@@ -8,11 +8,8 @@
 - Python 3.13: make rapidocr-onnxruntime optional (no 3.13 release; install fails), installer should `venv --clear`.
 - Fish detector: YOLOE finds no fish on 36/50 white-background photos (Dick 2012-13, datasets/test-100-2026-10-22): add a fallback (background threshold + SAM) or train the detector.
 - Body-part model with its annotation screen.
-- Pre-trained models from the training kit (`training_kit/`, van der Bijl 2025 photos): import a new model kind
-  `outline` (YOLO11s-seg, classes body and caudal, `models/outline_vN`, same checks as the other models) and use
-  it in the analysis instead of YOLOE+SAM (body and caudal fin masks directly: transparent fins, white
-  backgrounds); landmark training that starts from an imported landmark model instead of `yolo11n-pose.pt`, so
-  the researcher's clicks refine the pre-trained model.
+- Ritocco for outline models (needs outlines split into body and caudal fin on the researcher's photos) and
+  mixing a few van der Bijl photos into in-app training, as the training kit suggests.
 - Spectra estimated from the photos, as a separate long CSV (default reference library ['guppy_orange_cw'], standard
   colorchecker_simulated_colourworker). Run only when the chart fit uses all 24 patches with error <= 0.1, otherwise
   flag the photo (chart incomplete) and leave its spectra empty; spot masks only inside the fish mask; ~0.3 s/photo.
@@ -21,6 +18,19 @@
 - RAW photo support.
 - Verified update from GitHub releases (off while the repository is private).
 - Landmark model export as plain tensors (safetensors/npz) rebuilt locally on import, so a shared file never goes through an unpickler (security review suggestion).
+
+## 0.11.0 (2026-10-26)
+- **Outline models**: Settings > Fish outline can use an imported outline model instead of the automatic detector,
+  e.g. `outline_vanderbijl.zip` from the training kit (body and tail fin drawn separately). The body area and
+  whether the tail fin is in the outline then come from the model. Where it finds no fish, or its outline is in
+  pieces, cut by the border or oddly shaped, the automatic detector is used for that photo (new flags
+  `outline_model_missed`, `outline_model_rejected`, `outline_model_error`). New CSV column `outline_source`.
+  Changing the outline model marks the photos for a new analysis; projects that do not use one stay as they are.
+- **Ritocco**: Landmarks > Start from: training can start from a landmark model of the project (e.g. the imported
+  `landmarks_vanderbijl.zip`) and refine it with your clicks, in at most 60 rounds with gentle steps.
+- Landmark models can say which landmarks they were never trained on (the training kit's has no dorsal fin base
+  and gonopodium base): those are no longer predicted. A model's own image size is used for predictions.
+- Export / Import model works for outline models too.
 
 ## 0.10.0 (2026-10-23)
 - **Landmarks win over the outline** (new module `sizes.py`), as soon as they are clicked on screen 8 or predicted:

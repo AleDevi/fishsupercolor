@@ -359,10 +359,44 @@ def measure_colours(project, r, corrected, mask):
     return ['colours_uncertain'] if conf < 0.6 else []
 
 
+def outline_problems(mask):
+    """Quality flags of an outline alone (border, pieces, shape), to choose between two outlines."""
+    try:
+        return mask_flags(mask, morpho.measure(mask))
+    except Exception:
+        return ['unusual_shape']
+
+
+def find_outline(project, img, segmenter=None):
+    """Fish mask from the imported outline model when one is in use (with its parts, e.g. body and caudal fin),
+    else from the zero-training detector (YOLOE + SAM). Returns (mask, parts, confidence, source, flags); a model
+    that finds no fish or fails falls back to the detector, with a flag."""
+    from .engine import segment
+    name = project.settings.get('outline', {}).get('model')
+    flags = []
+    if name and segmenter is None:
+        from . import outline
+        try:
+            parts, conf = outline.predict(project, name, img)
+            if parts:
+                mask = np.logical_or.reduce(list(parts.values()))
+                bad = outline_problems(mask)
+                if not bad:
+                    return mask, parts, conf, name, flags
+                other, _, conf2 = (segmenter or segment.segment_fish)(img)    # the detector may do better
+                if other is None or not other.any() or len(outline_problems(other)) >= len(bad):
+                    return mask, parts, conf, name, flags
+                return other, {}, conf2, 'detector', flags + ['outline_model_rejected']
+            else:
+                flags.append('outline_model_missed')
+        except Exception:
+            flags.append('outline_model_error')
+    mask, _, conf = (segmenter or segment.segment_fish)(img)
+    return mask, {}, conf, 'detector', flags
+
+
 def analyse(project, folder, photo, segmenter=None, reference=None, expected_ids=None, label=None):
     """Full analysis of one photo; returns the result dict (also saved in the project)."""
-    from .engine import segment
-    seg = segmenter or segment.segment_fish
     t0 = time.time()
     st = project.settings
     pid = project.photo_id(photo)
@@ -402,11 +436,13 @@ def analyse(project, folder, photo, segmenter=None, reference=None, expected_ids
         corrected, info, f = correct_colour(img, st, reference)
         r.update(info); flags += f
         manual = manual_mask_path(project, photo)
+        parts = {}
         if os.path.exists(manual):
             mask, conf = cv2.imread(manual, cv2.IMREAD_GRAYSCALE) > 0, 1.0
-            r['manual_mask'] = True
+            r.update(manual_mask=True, outline_source='manual')
         else:
-            mask, box, conf = seg(img)
+            mask, parts, conf, src, f = find_outline(project, img, segmenter)
+            r['outline_source'] = src; flags += f
         r['fish_confidence'] = round(float(conf), 3)
         if mask is None or not mask.any():
             r.update(status='error', flags=';'.join(flags + ['fish_not_found']), seconds=round(time.time() - t0, 1))
@@ -416,6 +452,12 @@ def analyse(project, folder, photo, segmenter=None, reference=None, expected_ids
         r.update(sc); flags += f
         morph = morpho.measure(mask, img, head=None if st.get('head', 'left') == 'auto' else st.get('head', 'left'))
         r.update(fish_area_px=morph['area_px'], mask_length_px=round(morph['tl_px'], 1))
+        if 'body' in parts and len(parts) > 1:        # the outline model drew the parts: they win over the guess
+            morph['body_area_px'] = int(parts['body'].sum())
+            morph['fin_found'] = bool(parts.get('caudal') is not None and parts['caudal'].any())
+            for k, m in parts.items():
+                if k != 'body' and m.any():
+                    cv2.imwrite(os.path.join(project.dir('masks'), f'{pid}_{k}.png'), m.astype(np.uint8) * 255)
         r['outline'] = {'body_area_px': morph['body_area_px'], 'max_depth_px': round(morph['max_depth_px'], 1),
                         'mask_length_px': r['mask_length_px'], 'fin_found': morph['fin_found'],
                         'axis': [round(float(v), 4) for v in morph['axis']]}
