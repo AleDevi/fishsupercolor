@@ -9,7 +9,7 @@ import cv2
 import numpy as np
 from PIL import Image, ImageOps
 
-from . import metadata, sizes
+from . import metadata, profile, sizes
 from .engine import colour, morpho, scale
 
 CHART_MAX_ERR = 0.1      # find_chart pattern error above this = no usable chart
@@ -453,10 +453,11 @@ def analyse(project, folder, photo, segmenter=None, reference=None, expected_ids
         morph = morpho.measure(mask, img, head=None if st.get('head', 'left') == 'auto' else st.get('head', 'left'))
         r.update(fish_area_px=morph['area_px'], mask_length_px=round(morph['tl_px'], 1))
         if 'body' in parts and len(parts) > 1:        # the outline model drew the parts: they win over the guess
+            part_keys = {pt['key'] for pt in profile.load(st['profile']).get('parts', [])}
             morph['body_area_px'] = int(parts['body'].sum())
             morph['fin_found'] = bool(parts.get('caudal') is not None and parts['caudal'].any())
             for k, m in parts.items():
-                if k != 'body' and m.any():
+                if k != 'body' and m.any() and k in part_keys and profile.SAFE_NAME.fullmatch(k):    # from its json
                     cv2.imwrite(os.path.join(project.dir('masks'), f'{pid}_{k}.png'), m.astype(np.uint8) * 255)
         r['outline'] = {'body_area_px': morph['body_area_px'], 'max_depth_px': round(morph['max_depth_px'], 1),
                         'mask_length_px': r['mask_length_px'], 'fin_found': morph['fin_found'],

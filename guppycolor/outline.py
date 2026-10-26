@@ -15,6 +15,9 @@ JOIN_PX = 15        # a part counts as the fish's when it touches the body (afte
 
 
 def model_weights(project, name):
+    from .profile import SAFE_NAME
+    if not SAFE_NAME.fullmatch(name or ''):
+        raise ValueError(f'invalid model name: {name!r}')
     return os.path.join(project.dir('models'), name, 'best.pt')
 
 
