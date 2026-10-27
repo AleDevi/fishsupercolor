@@ -2,7 +2,7 @@
 
 One page for every model Guppy Colour uses: which ones exist, where they are saved, where to load them in the
 app, where to find the ones already trained, and how to train new ones on the app or with the **GuppyTraining**
-kit. Updated with every release (last update: app 0.11.0, GuppyTraining 0.1.1).
+kit. Updated with every release (last update: app 0.12.0, GuppyTraining 0.1.1).
 
 - [In short: what to use today](#in-short-what-to-use-today)
 - [The four kinds of model](#the-four-kinds-of-model)
@@ -22,7 +22,8 @@ kit. Updated with every release (last update: app 0.11.0, GuppyTraining 0.1.1).
 | --- | --- | --- |
 | Fish outline | *Automatic* (YOLOE + SAM 2.1). The van der Bijl outline model is better on photos like theirs, worse on graph paper with closed fins: try both on a few photos | 2 Settings > Fish outline |
 | Landmarks (SL, TL, depth) | Import `landmarks_vanderbijl.zip`, click the landmarks on 10–30 of your photos, **Train** with **Start from** = the imported model (Ritocco) | 8 Landmarks |
-| Colour classes | Your own model, trained with brush strokes | 7 Training |
+| Colour classes | Your own model, trained with brush strokes; when the van der Bijl orange/black model is ready, import it and refine it with your strokes (Ritocco) | 7 Training |
+| Iridescent | Optional: off in new projects. Switch it on only if you need it, then paint it in Training | 2 Settings > What to measure |
 
 After changing a model, run **3 Analysis** again.
 
@@ -60,7 +61,7 @@ it has to be imported on the screen of that kind:
 
 | File | Kind | Import it in | Then |
 | --- | --- | --- | --- |
-| `colours_*.zip` | colour | 7 Training > **Import model…** | it is put in use; check it with *Show what the model sees* |
+| `colours_*.zip`, e.g. `colours_vanderbijl.zip` (coming) | colour | 7 Training > **Import model…** | it is put in use; check it with *Show what the model sees*, then refine it (Ritocco, below). It may have only some classes (orange, black, body without colour) |
 | `landmarks_*.zip`, e.g. `landmarks_vanderbijl.zip` | landmarks | 8 Landmarks > **Import model…** | it is put in use; for your photos, refine it (Ritocco, below) |
 | `outline_*.zip`, e.g. `outline_vanderbijl.zip` | outline | 2 Settings > Fish outline > **Import outline model…** | it is put in use; *Automatic* in the same list switches back |
 
@@ -73,6 +74,7 @@ the colour classes, landmarks or body parts of the model are those of the projec
 | --- | --- | --- | --- |
 | `landmarks_vanderbijl.zip` | about 1,570 van der Bijl 2025 photos (live males in a tank), GuppyTraining 0.1.1, 26 Oct 2026 | work PC: `Experiments\Padova\Guppy colouration automation\Risultati Training\results` | snout, eye, end of the caudal peduncle, tail tip; no dorsal fin base, no gonopodium base (click those yourself). On their test photos SL error about 1.5%; on our graph-paper photos the snout/eye/peduncle are good on about half: use it as the start for Ritocco |
 | `outline_vanderbijl.zip` | same photos | same folder | body and caudal fin; on their photos overlap 0.98; on ours it often misses the closed, transparent caudal fin |
+| `colours_vanderbijl.zip` | van der Bijl orange and black masks | not made yet: next GuppyTraining version | orange, black and body without colour, no iridescent; their photos have no colour chart, so refine it on yours |
 | your colour and landmark models | your photos | `models\` of each project | export them to reuse them |
 
 The report of that training (`report.html`) and the test on our photos (`prova_foto_Ale.html`) are in the same
@@ -94,7 +96,11 @@ everywhere: start it and let it run. Only GuppyTraining installs the version tha
 ## Training in the app (any PC)
 
 **Colour classes** (7 Training): paint strokes of each class on 5–10 fish, **Train**, look at *Show what the
-model sees*, add strokes where it is wrong, train again. Details in the README, section *7 Training*.
+model sees*, add strokes where it is wrong, train again. **Start from** works as for landmarks (Ritocco): choose an
+imported colour model and your strokes count 3 times more than its pixels. Only models that keep their training
+pixels can be a start: those trained or exported with app 0.12 or later. Optional classes (iridescent) have a
+brush only when they are switched on in Settings. Strokes and colours count only inside the fish outline, so fix
+the outline (tail included) in 4 Review first. Details in the README, section *7 Training*.
 
 **Landmarks** (8 Landmarks):
 

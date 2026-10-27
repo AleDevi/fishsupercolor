@@ -361,6 +361,9 @@ class SettingsPage(QWidget):
         gl.addRow('Size only when the id or file name matches', self.size_only)
         gl.addRow(note('Folders can be set to size only in Project, single photos in Review '
                        '(e.g. females, where colour is not measured).'))
+        self.opt_lay = QVBoxLayout()
+        gl.addRow(self.opt_lay)
+        self.opt_classes = {}
         lay.addWidget(g)
         lay.addStretch()
 
@@ -383,6 +386,18 @@ class SettingsPage(QWidget):
         for b in self.an_default.buttons():
             b.setChecked(b.property('key') == st['analysis'].get('default', 'size_colour'))
         self.size_only.setText(st['analysis'].get('size_only_pattern', ''))
+        for c in self.opt_classes.values():
+            c.deleteLater()
+        self.opt_classes = {}
+        for c in profile.load(st['profile'])['colour_classes']:
+            if c.get('optional'):
+                cb = QCheckBox(f"Measure the colour class {c['label']}")
+                cb.setToolTip('Optional class: when off, its pixels count as body without colour, it has no brush in '
+                              'Training and its CSV columns are NA')
+                cb.setChecked(c['key'] not in (st.get('colours_off') or []))
+                cb.toggled.connect(self.changed)
+                self.opt_lay.addWidget(cb)
+                self.opt_classes[c['key']] = cb
         self.fill_outline_models(p)
         for k, e in self.lab_fields.items():
             e.setText(st['labels'].get(k, ''))
@@ -480,6 +495,7 @@ class SettingsPage(QWidget):
         st['analysis']['default'] = (self.an_default.checkedButton().property('key') if self.an_default.checkedButton()
                                      else 'size_colour')
         st['analysis']['size_only_pattern'] = self.size_only.text().strip()
+        st['colours_off'] = sorted(k for k, c in self.opt_classes.items() if not c.isChecked())
         for k, e in self.lab_fields.items():
             st['labels'][k] = e.text().strip()
         p.save()

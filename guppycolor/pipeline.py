@@ -348,7 +348,8 @@ def measure_colours(project, r, corrected, mask):
     cs = project.settings['colours']
     forest = training.load_model(project, cs['model'])
     colori, labmap, conf = training.measure_colours(corrected, mask, forest, r.get('px_per_mm') if r.get('scale_ok') else None,
-                                                   cs.get('merge_mm', 0), cs.get('min_spot_mm2', 0))
+                                                   cs.get('merge_mm', 0), cs.get('min_spot_mm2', 0),
+                                                   training.classes_off(project))
     r.update(colours=colori, colour_model=cs['model'], colour_confidence=round(conf, 3))
     try:                            # class map kept for the pattern screen, if installed
         from . import pattern

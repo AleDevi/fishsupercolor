@@ -12,6 +12,7 @@ import numpy as np
 FEATURES_VERSION = 1
 SIGMAS = (1.0, 2.0, 4.0)
 WORK_SIDE = 900          # the fish crop is classified with its long side at this size
+N_FEATURES = 5 + 6 * len(SIGMAS)
 
 
 def features(rgb):
@@ -70,8 +71,8 @@ class Forest:
         self.proba, self.roots, self.classes, self.meta = proba, roots, classes, meta or {}
 
     @classmethod
-    def train(cls, X, y, trees=60, depth=14, seed=0, progress=None):
-        """progress(trees done, trees) while the forest grows (in steps of 10 trees)."""
+    def train(cls, X, y, trees=60, depth=14, seed=0, progress=None, sample_weight=None):
+        """progress(trees done, trees) while the forest grows (in steps of 10 trees); sample_weight: per pixel."""
         from sklearn.ensemble import RandomForestClassifier
         from sklearn.utils.class_weight import compute_class_weight
         oob = len(np.unique(y)) > 1 and len(y) >= 50
@@ -82,7 +83,7 @@ class Forest:
         for n in range(min(10, trees), trees + 10, 10):
             n = min(n, trees)
             rf.set_params(n_estimators=n, oob_score=oob and n == trees)      # held-out accuracy once, at the end
-            rf.fit(X, y)
+            rf.fit(X, y, sample_weight=sample_weight)
             if progress:
                 progress(n, trees)
             if n == trees:
@@ -117,9 +118,11 @@ class Forest:
             P += self.proba[node]
         return P / len(self.roots)
 
-    def save(self, path_npz):
+    def save(self, path_npz, pool=None):
+        """pool: optional extra arrays saved alongside (the training pixels, see training.load_pool)."""
         np.savez_compressed(path_npz, left=self.left, right=self.right, feature=self.feature,
-                            threshold=self.threshold, proba=self.proba, roots=self.roots, classes=self.classes)
+                            threshold=self.threshold, proba=self.proba, roots=self.roots, classes=self.classes,
+                            **(pool or {}))
         with open(os.path.splitext(path_npz)[0] + '.json', 'w', encoding='utf-8') as f:
             json.dump(self.meta, f, indent=2, ensure_ascii=False)
 

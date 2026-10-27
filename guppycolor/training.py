@@ -22,13 +22,28 @@ PAINT = ['#FF7F27', '#22B14C', '#3F48CC', '#ED1C24', '#00A2E8', '#B5E61D', '#FFC
 
 
 def brushes(prof):
-    """[{index, key, label, display, paint}] for the profile's colour classes + base + riflesso."""
+    """[{index, key, label, display, paint}] for the profile's colour classes + base + riflesso. The index is the
+    value in the stroke files, so it never depends on which classes are measured."""
     out = []
     for i, c in enumerate(prof['colour_classes']):
         out.append(dict(c, index=i + 1, paint=c.get('paint') or PAINT[i % len(PAINT)]))
     for j, c in enumerate(EXTRA):
         out.append(dict(c, index=len(out) + 1))
     return out
+
+
+def classes_off(project, prof=None):
+    """Optional colour classes of the profile that the project does not measure (Settings > What to measure)."""
+    prof = prof or profile.load(project.settings['profile'])
+    off = set(project.settings.get('colours_off') or [])
+    return {c['key'] for c in prof['colour_classes'] if c.get('optional') and c['key'] in off}
+
+
+def active_brushes(project, prof=None):
+    """The brushes of the classes the project measures."""
+    prof = prof or profile.load(project.settings['profile'])
+    off = classes_off(project, prof)
+    return [b for b in brushes(prof) if b['key'] not in off]
 
 
 def hex_rgb(h):
@@ -143,9 +158,52 @@ def list_models(project):
     return out
 
 
-def train(project, progress=None):
-    """Train on every photo with strokes. Returns (model name, meta). Needs >= 2 brushes used."""
+POOL_PER_CLASS = 10000   # pixels per class kept in a model, to start other trainings from it (Ritocco)
+OWN_WEIGHT = 3.0         # a pixel of your strokes counts this much more than one of the model you start from
+
+
+def load_pool(project, name):
+    """Pixels a colour model was trained on: (features, class keys, own) or None for models without them.
+    own = True for the pixels of this project's strokes, which are read again from the stroke files."""
+    if not profile.SAFE_NAME.fullmatch(name or ''):
+        raise ValueError(f'invalid model name: {name!r}')
+    p = os.path.join(models_dir(project), name + '.npz')
+    with np.load(p, allow_pickle=False) as z:
+        if 'pool_X' not in z.files:
+            return None
+        X, y, own = z['pool_X'], z['pool_y'], z['pool_own']
+    meta = dict(list_models(project)).get(name, {})
+    keys = {c['index']: c['key'] for c in meta.get('classes', [])}
+    return X.astype(np.float32), np.array([keys.get(int(v), '') for v in y]), own.astype(bool)
+
+
+def pool_models(project):
+    """Colour models of the project that can be a start for Ritocco (they keep their training pixels)."""
+    out = []
+    for name, meta in list_models(project):
+        if meta.get('pool_pixels'):
+            out.append((name, meta))
+    return out
+
+
+def _sample(y, per_class, seed=0):
+    rng = np.random.default_rng(seed)
+    keep = []
+    for k in np.unique(y):
+        idx = np.flatnonzero(y == k)
+        keep.append(rng.choice(idx, per_class, replace=False) if len(idx) > per_class else idx)
+    return np.sort(np.concatenate(keep)) if keep else np.zeros(0, np.int64)
+
+
+def train(project, progress=None, start_from=None):
+    """Train on every photo with strokes, optionally on top of the pixels of another colour model (start_from,
+    Ritocco). Returns (model name, meta). Needs >= 2 classes."""
     prof = profile.load(project.settings['profile'])
+    active = active_brushes(project, prof)
+    index = {b['key']: b['index'] for b in active}
+    on = np.zeros(256, bool)
+    on[list(index.values())] = True
+    reflection = next(b['index'] for b in brushes(prof) if b['key'] == 'reflection')
     data = annotated(project)
     X, y, used = [], [], []
     trees = 60
@@ -158,28 +216,43 @@ def train(project, progress=None):
             continue
         img = corrected_image(project, photo)
         st = load_strokes(project, photo, img.shape)
-        st[~mask & (st != len(brushes(prof)))] = 0       # strokes outside the fish are ignored (reflections excepted)
+        st[~mask & (st != reflection)] = 0       # strokes outside the fish are ignored (reflections excepted)
+        st[~on[st]] = 0                           # and those of classes not measured
         xi, yi = pixels.training_pixels(img, mask | (st > 0), st)
         if len(yi):
             X.append(xi); y.append(yi); used.append(os.path.basename(photo))
-    if not X:
+    if not X and not start_from:
         raise ValueError('No strokes on the fish: paint at least two classes on a few photos.')
-    X, y = np.concatenate(X), np.concatenate(y)
+    X = np.concatenate(X) if X else np.zeros((0, pixels.N_FEATURES), np.float32)
+    y = np.concatenate(y) if y else np.zeros(0, np.uint8)
+    own = np.ones(len(y), bool)
+    w = np.full(len(y), OWN_WEIGHT if start_from else 1.0, np.float32)
+    if start_from:
+        pool = load_pool(project, start_from)
+        if pool is None:
+            raise ValueError(f'{start_from} keeps no training pixels: it cannot be a start. Train without it.')
+        PX, keys, pown = pool
+        take = ~pown & np.isin(keys, list(index))     # this project's own strokes are already read above
+        PX, py = PX[take], np.array([index[k] for k in keys[take]], np.uint8)
+        X, y = np.concatenate([X, PX]), np.concatenate([y, py])
+        own, w = np.concatenate([own, np.zeros(len(py), bool)]), np.concatenate([w, np.ones(len(py), np.float32)])
     if len(np.unique(y)) < 2:
         raise ValueError('Strokes of at least two different brushes are needed.')
-    forest = pixels.Forest.train(X, y, trees=trees, progress=progress and (
+    forest = pixels.Forest.train(X, y, trees=trees, sample_weight=w, progress=progress and (
         lambda k, n: progress(len(data) + k, total, f'Growing the forest: {k} of {n} trees')))
     n = len(list_models(project)) and max(int(re.findall(r'v(\d+)', m)[-1]) for m, _ in list_models(project))
     name = f'colours_v{n + 1}'
-    b = brushes(prof)
+    keep = _sample(y, POOL_PER_CLASS)
     forest.meta.update({
         'name': name, 'date': datetime.datetime.now().isoformat(timespec='minutes'),
         'annotator': project.settings.get('training', {}).get('annotator', ''),
         'profile': project.settings['profile'], 'features_version': pixels.FEATURES_VERSION,
-        'classes': [{k: c[k] for k in ('index', 'key', 'label', 'display')} for c in b],
-        'photos': used, 'pixels_per_class': {c['key']: int((y == c['index']).sum()) for c in b},
+        'classes': [{k: c[k] for k in ('index', 'key', 'label', 'display')} for c in active],
+        'photos': used, 'pixels_per_class': {c['key']: int((y[own] == c['index']).sum()) for c in active},
+        'started_from': start_from or '', 'pool_pixels': int(len(keep)),
     })
-    forest.save(os.path.join(models_dir(project), name + '.npz'))
+    forest.save(os.path.join(models_dir(project), name + '.npz'),
+                pool={'pool_X': X[keep], 'pool_y': y[keep], 'pool_own': own[keep]})
     return name, forest.meta
 
 
@@ -195,14 +268,20 @@ def load_model(project, name):
     return _cache[key]
 
 
-def measure_colours(corrected, mask, forest, px_per_mm=None, merge_mm=0.0, min_spot_mm2=0.0):
-    """Areas (px of the original photo) per class and the single spots; also the label map for the check image."""
+def measure_colours(corrected, mask, forest, px_per_mm=None, merge_mm=0.0, min_spot_mm2=0.0, off=()):
+    """Areas (px of the original photo) per class and the single spots; also the label map for the check image.
+    Classes in `off` (not measured) count as body without colour."""
     lab, box, s, conf = pixels.classify(corrected, mask, forest)
+    classes = [c for c in forest.meta.get('classes', []) if c['key'] not in off]
+    base = next((c['index'] for c in classes if c['key'] == 'base'), None)
+    for c in forest.meta.get('classes', []):
+        if c['key'] in off and base is not None:
+            lab[lab == c['index']] = base
     to_full = 1 / s ** 2
     merge_px = int(round(merge_mm * px_per_mm * s)) if px_per_mm and merge_mm else 0
     min_px = max(1, int(min_spot_mm2 * px_per_mm ** 2 * s ** 2)) if px_per_mm and min_spot_mm2 else 1
     out = {}
-    for c in forest.meta.get('classes', []):
+    for c in classes:
         k = lab == c['index']
         out[c['key']] = {'area_px': round(float(k.sum()) * to_full, 1)}
         if c['key'] not in ('base', 'reflection'):

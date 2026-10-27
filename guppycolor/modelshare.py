@@ -87,6 +87,33 @@ def read_package(path):
     return manifest, data
 
 
+def fit_colour_classes(arrays, meta, pool, mine):
+    """Colour model of another project -> this project's brush numbers. Its classes must be some of this project's
+    (e.g. only orange, black and body without colour). The training pixels it keeps are checked and become
+    'not your strokes' here, so Ritocco uses them."""
+    index = {b['key']: b['index'] for b in mine}
+    classes = meta.get('classes') or []
+    theirs = [c.get('key') for c in classes]
+    if len(set(theirs)) < 2 or not set(theirs) <= set(index):
+        raise ValueError('the colour classes of this model (' + ', '.join(map(str, theirs)) + ') are not among the '
+                         'ones of this project (' + ', '.join(index) + ')')
+    remap = np.zeros(256, np.uint8)
+    for c in classes:
+        remap[int(c['index'])] = index[c['key']]
+    if not np.isin(arrays['classes'], [c['index'] for c in classes]).all():
+        raise ValueError('the colour model is damaged (unknown class)')
+    arrays = dict(arrays, classes=remap[arrays['classes']])
+    meta = dict(meta, classes=[dict(c, index=index[c['key']], label=next(b['label'] for b in mine if b['key'] == c['key']))
+                               for c in classes])
+    if pool is not None:
+        X, y = pool['pool_X'], pool['pool_y']
+        if (X.ndim != 2 or X.shape[1] != pixels.N_FEATURES or y.shape != (len(X),) or pool['pool_own'].shape != y.shape
+                or not np.isin(y, [c['index'] for c in classes]).all() or not np.isfinite(X).all()):
+            raise ValueError('the colour model is damaged (training pixels)')
+        pool = {'pool_X': X.astype(np.float32), 'pool_y': remap[y], 'pool_own': np.zeros(len(y), bool)}
+    return arrays, meta, pool
+
+
 def import_model(project, path):
     """Add the model in the zip `path` to this project. Returns (new name, meta)."""
     manifest, data = read_package(path)
@@ -100,18 +127,15 @@ def import_model(project, path):
         with io.BytesIO(data['model.npz']) as b:
             with np.load(b, allow_pickle=False) as z:
                 arrays = {k: z[k] for k in ('left', 'right', 'feature', 'threshold', 'proba', 'roots', 'classes')}
-        forest = pixels.Forest(meta=meta, **arrays)
+                pool = {k: z[k] for k in ('pool_X', 'pool_y', 'pool_own')} if 'pool_X' in z.files else None
         if meta.get('features_version', pixels.FEATURES_VERSION) != pixels.FEATURES_VERSION:
             raise ValueError('this colour model was made by a different version of the pixel features')
-        mine = [c['key'] for c in training.brushes(prof)]
-        theirs = [c.get('key') for c in meta.get('classes', [])]
-        if theirs != mine:
-            raise ValueError('the colour classes of this model (' + ', '.join(map(str, theirs)) + ') differ from the '
-                             'ones of this project (' + ', '.join(mine) + ')')
+        arrays, meta, pool = fit_colour_classes(arrays, meta, pool, training.brushes(prof))
+        forest = pixels.Forest(meta=meta, **arrays)
         nums = [int(n.rsplit('_v', 1)[1]) for n, _ in training.list_models(project)]
         name = f'colours_v{max(nums, default=0) + 1}'
-        forest.meta.update(name=name, imported_from=origin)
-        forest.save(os.path.join(models, name + '.npz'))
+        forest.meta.update(name=name, imported_from=origin, pool_pixels=0 if pool is None else len(pool['pool_y']))
+        forest.save(os.path.join(models, name + '.npz'), pool=pool)
         return name, forest.meta
     if kind == 'landmarks':
         keys = [l['key'] for l in landmarks.landmark_list(prof)]

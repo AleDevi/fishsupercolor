@@ -19,6 +19,22 @@
 - Verified update from GitHub releases (off while the repository is private).
 - Landmark model export as plain tensors (safetensors/npz) rebuilt locally on import, so a shared file never goes through an unpickler (security review suggestion).
 
+## 0.12.0 (2026-10-27)
+- **Optional colour classes**: the iridescent class is now optional (`"optional": true` in the profile). Settings >
+  What to measure > *Measure the colour class Iridescent* switches it on or off. New projects start with it off;
+  projects made before keep it on (switch it off there by hand if you wish: the photos are then marked for a new
+  analysis). When off, its pixels count as body without colour, Training has no brush for it, and its CSV columns
+  (`area_iridescent_mm2`, `pct_iridescent`, `n_spots_iridescent`, `spots_iridescent_mm2`) are `NA` (not 0).
+- **Ritocco for colour models**: Training > Start from: a colour model that keeps its training pixels (e.g. one
+  pre-trained on the van der Bijl 2025 orange and black masks, imported with Import model…) is used as a start, and
+  your brush strokes count 3 times more than its pixels. Every colour model trained from now on keeps up to 10,000
+  of its training pixels per class (a few MB), so it can be a start in another project. Models trained before 0.12
+  cannot be a start (train them again).
+- Import model (colours) accepts a model with only some of the project's classes (e.g. orange, black and body
+  without colour): the missing classes are not measured by it until you paint them and train with Ritocco.
+- New guide `MODELS_AND_TRAINING.md`: which models exist, where they are saved, which file to import on which
+  screen, where the trained models are, and how to train on each PC (app and GuppyTraining kit).
+
 ## 0.11.0 (2026-10-26)
 - **Outline models**: Settings > Fish outline can use an imported outline model instead of the automatic detector,
   e.g. `outline_vanderbijl.zip` from the training kit (body and tail fin drawn separately). The body area and

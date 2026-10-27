@@ -95,7 +95,8 @@ analysis at the next Start.
   With *No id* or *File name* you can still read the label for its date and group.
 - **What to measure**: size and colour on every fish, or size only; a pattern on the fish id or file name
   can mark size-only fish (e.g. `_F\d+$` for females such as `F100_F1`). Folders can be set to size only in
-  **Project**, single photos in **Review**.
+  **Project**, single photos in **Review**. *Measure the colour class …* switches each optional colour class of the
+  profile on or off (guppy male: iridescent, off in new projects).
   **Print labels with QR code** makes an A4 PDF of labels (QR + large text) from a fish list.
 
 ### 3 Analysis
@@ -159,7 +160,10 @@ Landmarks clicked in screen 8 (or placed by the landmark model) are used: the sn
 2. On a few fish (5–10 to start), paint a few strokes of each class: one brush per colour class of the
    profile (keys 1, 2, 3…), plus *Body without colour* and *Light reflection*; **E** is the eraser. Mouse
    wheel zooms, right button drags. Strokes are saved as you paint.
-3. **Train**. The model (`models/colours_vN`) is used in the analysis straight away and **Show what the
+3. **Start from** (optional, *Ritocco*): a colour model that keeps its training pixels, e.g. one pre-trained on the
+   van der Bijl 2025 orange and black masks and imported with **Import model…**. Your strokes count 3 times more
+   than its pixels, so a few strokes adapt it to your light and camera. *nothing: only my strokes* trains from your
+   strokes alone. **Train**. The model (`models/colours_vN`) is used in the analysis straight away and **Show what the
    model sees** paints its prediction over the photo. Add strokes where it is wrong and train again; each
    training makes a new version, and **Use in the analysis** picks one.
 4. Run the **Analysis** again: the CSV gets the colour columns (below) and `check/*_colours.jpg` shows the
@@ -175,11 +179,17 @@ Landmarks clicked in screen 8 (or placed by the landmark model) are used: the sn
    comparison is on the totals.
 
 **Where the models are.** In the project folder, `models\colours_v1.npz` + `colours_v1.json` (date, annotator,
-photos, pixels per class); every training adds v2, v3… A bar shows the training progress.
+photos, pixels per class, `started_from`); every training adds v2, v3… A bar shows the training progress. Models
+trained from 0.12 on also keep up to 10,000 of their training pixels per class, so they can be a start for Ritocco.
+
+**Optional classes.** A class marked optional in the profile (for the guppy male: iridescent) is measured only when
+Settings > What to measure > *Measure the colour class …* is ticked; new projects start with it off. When off it has
+no brush, its pixels count as body without colour and its CSV columns are `NA`.
 
 **Export model… / Import model…** save the model chosen in *Use in the analysis* as one `.zip` file, to use it in
 another project or give it to a colleague. Import checks the file (fixed contents, SHA-256 of each part) and that
-its colour classes are those of the project's species profile, then adds it as the next version and puts it in use;
+its colour classes are among those of the project's species profile (a model with only orange, black and body
+without colour is fine: paint the other classes and train with Ritocco), then adds it as the next version and puts it in use;
 the model keeps where it came from (`imported_from` in its `.json`).
 
 Strokes made in Windows Paint can be imported: save a copy of the photo as `<photo name>_strokes.png` next
@@ -236,7 +246,7 @@ colour) and purple (reflection), then **Import strokes from Paint**.
 | `fish_area_mm2`, `body_area_mm2`, `body_area_source` | area of the outline; area without the caudal fin, cut at the peduncle landmark (`landmarks`) or where the outline narrows (`outline`) |
 | `caudal_area_mm2` | outline after the peduncle landmark, only when the tail fin is in the outline |
 | `outline_source` | what drew the outline: `detector` (automatic), `manual` (redone in Review) or the outline model (`outline_vN`) |
-| `area_<class>_mm2` | area of each colour class (with a colour model) |
+| `area_<class>_mm2` | area of each colour class (with a colour model); `NA` for an optional class that is not measured (Settings > What to measure) |
 | `pct_<class>` | % of the fish area (reflections left out) |
 | `n_spots_<class>` | number of separate spots |
 | `spots_<class>_mm2` | area of each spot, largest first, separated by `;` |

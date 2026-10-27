@@ -1,2 +1,2 @@
 """Guppy Colour: batch measurement of fish colour patterns."""
-__version__ = '0.11.0'
+__version__ = '0.12.0'

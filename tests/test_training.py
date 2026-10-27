@@ -150,3 +150,94 @@ def test_size_only_photos(spotted):
     p.save()
     pipeline.run(p, segmenter=filled_segmenter)
     assert all(r['analysis'] == 'size' for r in p.results())
+
+
+def test_optional_classes_are_off_in_new_projects_only(spotted, tmp_path):
+    import json
+    p = spotted
+    assert p.settings['colours_off'] == ['iridescent'] and training.classes_off(p) == {'iridescent'}
+    assert [b['key'] for b in training.active_brushes(p)] == ['orange', 'black', 'base', 'reflection']
+    # a project made before 0.12 has no colours_off: everything stays measured and its results stay current
+    with open(os.path.join(p.path, 'project.json'), encoding='utf-8') as f:
+        data = json.load(f)
+    data['settings'].pop('colours_off')
+    with open(os.path.join(p.path, 'project.json'), 'w', encoding='utf-8') as f:
+        json.dump(data, f)
+    old = Project(p.path)
+    assert training.classes_off(old) == set() and 'colours_off' not in json.dumps(
+        {k: old.settings[k] for k in ('colours',)})
+    h = old.settings_hash()
+    old.settings['colours_off'] = ['iridescent']
+    assert old.settings_hash() != h                    # switching a class off makes the results stale
+
+
+def test_class_switched_off_is_not_trained_and_is_na(spotted):
+    p = spotted
+    photo = paint_first(p)
+    st = training.load_strokes(p, photo, pipeline.load_image(photo).shape)
+    cv2.circle(st, (1000, 650), 8, 3, -1)              # iridescent strokes, not used while the class is off
+    training.save_strokes(p, photo, st)
+    name, meta = training.train(p)
+    assert 'iridescent' not in [c['key'] for c in meta['classes']] and 3 not in training.load_model(p, name).classes
+    p.settings['colours']['model'] = name
+    p.save()
+    pipeline.run(p, segmenter=filled_segmenter)
+    with open(export.write_csv(p), encoding='utf-8') as f:
+        r = next(csv.DictReader(f))
+    assert r['area_iridescent_mm2'] == 'NA' and r['pct_iridescent'] == 'NA' and r['area_orange_mm2'] != 'NA'
+    # a model that has the class, used where it is off: its pixels count as body without colour
+    forest = training.load_model(p, name)
+    img = training.corrected_image(p, photo)
+    mask = training.fish_mask(p, photo)
+    out, _, _ = training.measure_colours(img, mask, forest, off={'orange'})
+    on, _, _ = training.measure_colours(img, mask, forest)
+    assert 'orange' not in out and out['base']['area_px'] > on['base']['area_px']
+
+
+def test_ritocco_starts_from_an_imported_model(spotted, tmp_path):
+    from guppycolor import modelshare
+    a = spotted
+    paint_first(a)
+    name, meta = training.train(a)
+    assert meta['pool_pixels'] > 0 and training.pool_models(a)[0][0] == name
+    again, ameta = training.train(a, start_from=name)    # its pixels are this project's strokes: not counted twice
+    assert ameta['pool_pixels'] == meta['pool_pixels'] and ameta['pixels_per_class'] == meta['pixels_per_class']
+    z = modelshare.export_model(a, name, str(tmp_path / 'c.zip'))
+    folder = tmp_path / 'other'
+    folder.mkdir()
+    b = Project.create(str(tmp_path / 'b'), 'B', [str(folder)])
+    got, gmeta = modelshare.import_model(b, z)
+    X, keys, own = training.load_pool(b, got)
+    assert gmeta['pool_pixels'] == len(keys) and not own.any() and set(keys) <= {'orange', 'black', 'base'}
+    # no strokes in B yet: the imported pixels alone make a model; strokes would count OWN_WEIGHT times more
+    new, nmeta = training.train(b, start_from=got)
+    assert nmeta['started_from'] == got and nmeta['pixels_per_class'].get('orange', 0) == 0
+    f1, f2 = training.load_model(b, got), training.load_model(b, new)
+    F = X[:200]
+    assert (f1.classes[f1.predict_proba(F).argmax(1)] == f2.classes[f2.predict_proba(F).argmax(1)]).mean() > 0.9
+
+
+def test_import_colour_model_with_some_of_the_classes(tmp_path):
+    from guppycolor import modelshare, profile
+    folder = tmp_path / 'f'
+    folder.mkdir()
+    p = Project.create(str(tmp_path / 'p'), 'P', [str(folder)])
+    rng = np.random.default_rng(0)
+    X = rng.normal(size=(300, pixels.N_FEATURES)).astype(np.float32)
+    y = np.where(X[:, 0] > 0.5, 7, np.where(X[:, 0] < -0.5, 8, 9)).astype(np.uint8)   # other numbers, same keys
+    f = pixels.Forest.train(X, y, trees=10)
+    f.meta.update(classes=[{'index': 7, 'key': 'orange', 'label': 'o', 'display': '#E8742A'},
+                           {'index': 8, 'key': 'black', 'label': 'b', 'display': '#222222'},
+                           {'index': 9, 'key': 'base', 'label': 'x', 'display': '#C8C0A8'}],
+                  features_version=pixels.FEATURES_VERSION)
+    arrays = {k: getattr(f, k) for k in ('left', 'right', 'feature', 'threshold', 'proba', 'roots', 'classes')}
+    pool = {'pool_X': X, 'pool_y': y, 'pool_own': np.ones(len(y), bool)}
+    mine = training.brushes(profile.load('guppy_male'))
+    arrays2, meta2, pool2 = modelshare.fit_colour_classes(arrays, f.meta, pool, mine)
+    assert sorted(arrays2['classes'].tolist()) == [1, 2, 4] and set(pool2['pool_y'].tolist()) == {1, 2, 4}
+    assert [c['index'] for c in meta2['classes']] == [1, 2, 4] and not pool2['pool_own'].any()
+    bad = dict(f.meta, classes=f.meta['classes'][:2] + [{'index': 9, 'key': 'gills', 'label': 'g', 'display': '#000'}])
+    with pytest.raises(ValueError, match='not among'):
+        modelshare.fit_colour_classes(arrays, bad, pool, mine)
+    with pytest.raises(ValueError, match='training pixels'):
+        modelshare.fit_colour_classes(arrays, f.meta, dict(pool, pool_X=X[:, :5]), mine)
