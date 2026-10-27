@@ -127,8 +127,11 @@ internet the first time (about 3 GB of packages), about 30 GB free.
    `carotenoid_coloration.zip`, `melanic_coloration_v2.zip`, `fixed_landmarks.zip` (leave the zips zipped) and
    the photos in `data\foto_2000\`. Optional: other photos in `data\other_photos\`, only drawn in the report.
 3. Double-click `install_training.bat`. At the end it must say "GPU OK".
-   **Updating the kit** (e.g. 0.1.1 to 0.2.0): unzip the new version over the old folder, keep `data\` and
-   `work\`, run `install_training.bat` again, then `start_training.bat`: only the new steps run.
+   **Updating the kit** (e.g. 0.1.1 to 0.2.0): unzip the new version into a new, empty folder (e.g.
+   `C:\GuppyTraining_0.2.0`), never over the old one, so that every package is installed again with its checked
+   hash. Move the folders `data\`, `work\` and `results\` from the old kit folder into the new one, run
+   `install_training.bat`, then `start_training.bat`: the steps already finished are skipped. Then delete the old
+   kit folder.
 4. Double-click `quick_test.bat` (a few minutes) to check the kit runs on this PC.
 5. Double-click `start_training.bat` and leave the PC on (about 1.5 h on the RTX 4070). If it stops, double-click
    it again: it resumes, and steps already finished are skipped.
