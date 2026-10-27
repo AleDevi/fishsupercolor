@@ -10,7 +10,7 @@ FIXED_COLUMNS = [
     'px_per_mm', 'scale_source', 'parts_included',
     'standard_length_mm', 'landmarks_source', 'total_length_mm', 'total_length_source', 'mask_length_mm',
     'caudal_length_mm', 'max_depth_mm', 'depth_source', 'fish_area_mm2', 'body_area_mm2', 'body_area_source',
-    'caudal_area_mm2', '{colori}',
+    'caudal_area_mm2', 'outline_source', '{colori}',
     'label_id', 'label_group', 'label_date', 'label_text', 'label_source',
     'label_confidence', 'label_needs_review', 'analysis',
     'fish_brightness', 'saturated_pct', 'sharpness', 'fish_confidence', 'status', 'flags', 'path',
@@ -50,7 +50,10 @@ def _colour_values(r, keys, ppm):
     fish = sum(v['area_px'] for k, v in c.items() if k != 'reflection') or None
     mm2 = (lambda px: px / ppm ** 2) if ppm else None
     for k in keys:
-        v = c.get(k, {'area_px': 0, 'spots_px': []})
+        if k not in c:                 # class not measured (switched off, or not in the model): NA, not 0
+            out.update({f'area_{k}_mm2': 'NA', f'pct_{k}': 'NA', f'n_spots_{k}': 'NA', f'spots_{k}_mm2': 'NA'})
+            continue
+        v = c[k]
         spots = v.get('spots_px', [])
         out[f'area_{k}_mm2'] = _num(mm2(v['area_px']) if mm2 else None, 3)
         out[f'pct_{k}'] = _num(100 * v['area_px'] / fish if fish else None, 2)
@@ -101,6 +104,7 @@ def rows(project):
             'body_area_mm2': _num(mm2(r.get('body_area_px')), 2),
             'body_area_source': r.get('body_area_source') or 'NA',           # cut at the peduncle landmark or outline
             'caudal_area_mm2': _num(mm2(r.get('caudal_area_px')), 2),      # NA when the fin is not in the outline
+            'outline_source': r.get('outline_source') or 'NA',              # detector, manual or outline_vN
             'fish_confidence': _num(r.get('fish_confidence'), 3),
             'fish_brightness': _num(r.get('fish_brightness'), 1), 'saturated_pct': _num(r.get('saturated_pct'), 2),
             'sharpness': _num(r.get('sharpness'), 2),

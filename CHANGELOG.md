@@ -8,6 +8,8 @@
 - Python 3.13: make rapidocr-onnxruntime optional (no 3.13 release; install fails), installer should `venv --clear`.
 - Fish detector: YOLOE finds no fish on 36/50 white-background photos (Dick 2012-13, datasets/test-100-2026-10-22): add a fallback (background threshold + SAM) or train the detector.
 - Body-part model with its annotation screen.
+- Ritocco for outline models (needs outlines split into body and caudal fin on the researcher's photos) and
+  mixing a few van der Bijl photos into in-app training, as the training kit suggests.
 - Spectra estimated from the photos, as a separate long CSV (default reference library ['guppy_orange_cw'], standard
   colorchecker_simulated_colourworker). Run only when the chart fit uses all 24 patches with error <= 0.1, otherwise
   flag the photo (chart incomplete) and leave its spectra empty; spot masks only inside the fish mask; ~0.3 s/photo.
@@ -23,6 +25,35 @@
   CC BY 4.0) on their original photos and trains an outline model (body + caudal fin) and a landmark model (snout,
   eye, end of the peduncle, tail tip, so SL and TL), checks both on held-out fish against their annotations
   (`report.html`) and writes model files in the app's export format. See `training_kit/README.md`.
+
+## 0.12.0 (2026-10-27)
+- **Optional colour classes**: the iridescent class is now optional (`"optional": true` in the profile). Settings >
+  What to measure > *Measure the colour class Iridescent* switches it on or off. New projects start with it off;
+  projects made before keep it on (switch it off there by hand if you wish: the photos are then marked for a new
+  analysis). When off, its pixels count as body without colour, Training has no brush for it, and its CSV columns
+  (`area_iridescent_mm2`, `pct_iridescent`, `n_spots_iridescent`, `spots_iridescent_mm2`) are `NA` (not 0).
+- **Ritocco for colour models**: Training > Start from: a colour model that keeps its training pixels (e.g. one
+  pre-trained on the van der Bijl 2025 orange and black masks, imported with Import model…) is used as a start, and
+  your brush strokes count 3 times more than its pixels. Every colour model trained from now on keeps up to 10,000
+  of its training pixels per class (a few MB), so it can be a start in another project. Models trained before 0.12
+  cannot be a start (train them again).
+- Import model (colours) accepts a model with only some of the project's classes (e.g. orange, black and body
+  without colour): the missing classes are not measured by it until you paint them and train with Ritocco.
+- New guide `MODELS_AND_TRAINING.md`: which models exist, where they are saved, which file to import on which
+  screen, where the trained models are, and how to train on each PC (app and GuppyTraining kit).
+
+## 0.11.0 (2026-10-26)
+- **Outline models**: Settings > Fish outline can use an imported outline model instead of the automatic detector,
+  e.g. `outline_vanderbijl.zip` from the training kit (body and tail fin drawn separately). The body area and
+  whether the tail fin is in the outline then come from the model. Where it finds no fish, or its outline is in
+  pieces, cut by the border or oddly shaped, the automatic detector is used for that photo (new flags
+  `outline_model_missed`, `outline_model_rejected`, `outline_model_error`). New CSV column `outline_source`.
+  Changing the outline model marks the photos for a new analysis; projects that do not use one stay as they are.
+- **Ritocco**: Landmarks > Start from: training can start from a landmark model of the project (e.g. the imported
+  `landmarks_vanderbijl.zip`) and refine it with your clicks, in at most 60 rounds with gentle steps.
+- Landmark models can say which landmarks they were never trained on (the training kit's has no dorsal fin base
+  and gonopodium base): those are no longer predicted. A model's own image size is used for predictions.
+- Export / Import model works for outline models too.
 
 ## 0.10.0 (2026-10-23)
 - **Landmarks win over the outline** (new module `sizes.py`), as soon as they are clicked on screen 8 or predicted:

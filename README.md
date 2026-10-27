@@ -22,6 +22,9 @@ are planned; photos of them can already be analysed for outline, size and colour
 - [For developers](#for-developers)
 - [What is missing](#what-is-missing)
 
+Models (which ones, where they are saved, how to load them, how to train them on each PC, the GuppyTraining
+kit): [MODELS_AND_TRAINING.md](MODELS_AND_TRAINING.md).
+
 ## Install (Windows)
 
 You need Python 3.12 from python.org (no other Python knowledge needed). Python 3.13 does not work yet: `rapidocr-onnxruntime` has no 3.13 release. Both versions can be installed side by side; the installer picks 3.12.
@@ -65,6 +68,14 @@ analysis at the next Start.
     imported as a CSV from the ImageJ plugin (`Patch,Name,R,G,B`, 0–255).
   - *Single calibration*: the transform measured on the reference photo is applied to every photo, also to photos without a chart.
   Photos without a chart are measured uncorrected and flagged `no_chart`.
+- **Fish outline**: *Automatic* (YOLOE + SAM 2.1, no training, works on any fish) or an imported **outline
+  model** (**Import outline model…**), e.g. `outline_vanderbijl.zip` from the training kit, pre-trained on the van
+  der Bijl 2025 guppy photos. An outline model draws the body and the tail fin separately: the body area and
+  whether the fin is in the outline then come from it. Where it finds no fish, or its outline is in pieces, cut by
+  the border or oddly shaped, the automatic detector is used for that photo (flags `outline_model_missed`,
+  `outline_model_rejected`). The CSV column `outline_source` says which drew each outline. On photos unlike the
+  ones it was trained on (graph paper with closed fins, dark or tight framing) the automatic one can be better:
+  try both on a few photos.
 - **Scale**: automatic from the graph paper (smallest square = 1 mm, measured over at least 20 squares = 2 cm),
   by hand (a known length drawn on the photo in Review), a fixed px/mm value (**Measure on a photo…** draws it on
   one photo), or none (pixels). A doubtful automatic scale goes to Review and, until it is confirmed, the CSV uses
@@ -84,7 +95,8 @@ analysis at the next Start.
   With *No id* or *File name* you can still read the label for its date and group.
 - **What to measure**: size and colour on every fish, or size only; a pattern on the fish id or file name
   can mark size-only fish (e.g. `_F\d+$` for females such as `F100_F1`). Folders can be set to size only in
-  **Project**, single photos in **Review**.
+  **Project**, single photos in **Review**. *Measure the colour class …* switches each optional colour class of the
+  profile on or off (guppy male: iridescent, off in new projects).
   **Print labels with QR code** makes an A4 PDF of labels (QR + large text) from a fish list.
 
 ### 3 Analysis
@@ -148,7 +160,10 @@ Landmarks clicked in screen 8 (or placed by the landmark model) are used: the sn
 2. On a few fish (5–10 to start), paint a few strokes of each class: one brush per colour class of the
    profile (keys 1, 2, 3…), plus *Body without colour* and *Light reflection*; **E** is the eraser. Mouse
    wheel zooms, right button drags. Strokes are saved as you paint.
-3. **Train**. The model (`models/colours_vN`) is used in the analysis straight away and **Show what the
+3. **Start from** (optional, *Ritocco*): a colour model that keeps its training pixels, e.g. one pre-trained on the
+   van der Bijl 2025 orange and black masks and imported with **Import model…**. Your strokes count 3 times more
+   than its pixels, so a few strokes adapt it to your light and camera. *nothing: only my strokes* trains from your
+   strokes alone. **Train**. The model (`models/colours_vN`) is used in the analysis straight away and **Show what the
    model sees** paints its prediction over the photo. Add strokes where it is wrong and train again; each
    training makes a new version, and **Use in the analysis** picks one.
 4. Run the **Analysis** again: the CSV gets the colour columns (below) and `check/*_colours.jpg` shows the
@@ -164,11 +179,17 @@ Landmarks clicked in screen 8 (or placed by the landmark model) are used: the sn
    comparison is on the totals.
 
 **Where the models are.** In the project folder, `models\colours_v1.npz` + `colours_v1.json` (date, annotator,
-photos, pixels per class); every training adds v2, v3… A bar shows the training progress.
+photos, pixels per class, `started_from`); every training adds v2, v3… A bar shows the training progress. Models
+trained from 0.12 on also keep up to 10,000 of their training pixels per class, so they can be a start for Ritocco.
+
+**Optional classes.** A class marked optional in the profile (for the guppy male: iridescent) is measured only when
+Settings > What to measure > *Measure the colour class …* is ticked; new projects start with it off. When off it has
+no brush, its pixels count as body without colour and its CSV columns are `NA`.
 
 **Export model… / Import model…** save the model chosen in *Use in the analysis* as one `.zip` file, to use it in
 another project or give it to a colleague. Import checks the file (fixed contents, SHA-256 of each part) and that
-its colour classes are those of the project's species profile, then adds it as the next version and puts it in use;
+its colour classes are among those of the project's species profile (a model with only orange, black and body
+without colour is fine: paint the other classes and train with Ritocco), then adds it as the next version and puts it in use;
 the model keeps where it came from (`imported_from` in its `.json`).
 
 Strokes made in Windows Paint can be imported: save a copy of the photo as `<photo name>_strokes.png` next
@@ -183,9 +204,15 @@ colour) and purple (reflection), then **Import strokes from Paint**.
    **Backspace** undoes, **N** goes to the next photo. Mouse wheel zooms, right button drags. Clicks are saved
    at once and the **standard length** (snout to end of the caudal peduncle) goes into the results straight
    away: no new analysis needed.
-3. With 10–30 photos clicked, **Train** makes a landmark model (YOLO-pose, `models/landmarks_vN`). It starts
-   from the small public `yolo11n-pose.pt` weights (downloaded once and checked against their SHA-256). A GPU
-   takes minutes, a CPU much longer. The new model is put in use; run the **Analysis** again to get SL (and
+3. With 10–30 photos clicked, **Train** makes a landmark model (YOLO-pose, `models/landmarks_vN`). **Start from**
+   chooses where it starts: the small public `yolo11n-pose.pt` weights (downloaded once and checked against their
+   SHA-256), or **Ritocco**: a landmark model of the project, e.g. `landmarks_vanderbijl.zip` from the training kit
+   (pre-trained on about 1,600 van der Bijl 2025 photos), imported with **Import model…**. Ritocco refines it with
+   your clicks in fewer rounds and with gentle steps, so a few photos adapt it to your setup without undoing what
+   it learnt. Landmarks a model was never trained on (the kit's has no dorsal fin base and gonopodium base) are
+   not predicted until you click them on some photos and train again. The app trains on the
+   processor (its installer does not install the graphics-card version), so give it time; the GuppyTraining kit
+   uses an NVIDIA card ([MODELS_AND_TRAINING.md](MODELS_AND_TRAINING.md)). The new model is put in use; run the **Analysis** again to get SL (and
    the landmarks) on every fish. Landmarks the model is unsure of (confidence < 0.5) are left out.
    A bar shows the training rounds; it may stop before the last one when the model no longer improves.
    **Export model… / Import model…** work as in Training (the landmarks must be the same as in the project's
@@ -218,7 +245,8 @@ colour) and purple (reflection), then **Import strokes from Paint**.
 | `max_depth_mm`, `depth_source` | maximum body depth: across the body at the gonopodium base (`landmarks`) or widest point of the outline (`outline`) |
 | `fish_area_mm2`, `body_area_mm2`, `body_area_source` | area of the outline; area without the caudal fin, cut at the peduncle landmark (`landmarks`) or where the outline narrows (`outline`) |
 | `caudal_area_mm2` | outline after the peduncle landmark, only when the tail fin is in the outline |
-| `area_<class>_mm2` | area of each colour class (with a colour model) |
+| `outline_source` | what drew the outline: `detector` (automatic), `manual` (redone in Review) or the outline model (`outline_vN`) |
+| `area_<class>_mm2` | area of each colour class (with a colour model); `NA` for an optional class that is not measured (Settings > What to measure) |
 | `pct_<class>` | % of the fish area (reflections left out) |
 | `n_spots_<class>` | number of separate spots |
 | `spots_<class>_mm2` | area of each spot, largest first, separated by `;` |
@@ -260,6 +288,9 @@ In R, the spots of one class: `strsplit(d$spots_orange_mm2, ";")`.
 | `blurry` | sharpness below 40% of the session median | |
 | `sl_landmarks_missing` | landmarks present but snout or end of the peduncle missing: no SL | |
 | `landmark_model_error` | the landmark model file changed or is missing: not used | |
+| `outline_model_missed` | the outline model found no fish: the automatic detector drew the outline | |
+| `outline_model_rejected` | the outline model's outline looked wrong (border, pieces, shape): the automatic detector's was better | |
+| `outline_model_error` | the outline model file changed or is missing: automatic detector used | |
 
 ## Project folder
 
@@ -268,7 +299,8 @@ In R, the spots of one class: `strsplit(d$spots_orange_mm2, ";")`.
   project.json            settings and photo folders
   colour_reference.csv    colour reference (Patch,Name,R,G,B)
   results/<photo>.json    everything measured on each photo (pixels)
-  masks/<photo>.png       fish outline; <photo>_manual.png = outline redone in Review
+  masks/<photo>.png       fish outline; <photo>_manual.png = outline redone in Review; <photo>_<part>.png =
+                          parts drawn by an outline model (e.g. caudal)
   check/<photo>.jpg       outline and measures drawn on the fish; <photo>_colours.jpg = colour classes
   training/strokes/       painted strokes (one PNG per photo, value = brush number)
   training/images/        colour-corrected photos used for training (cache)
@@ -276,6 +308,7 @@ In R, the spots of one class: `strsplit(d$spots_orange_mm2, ";")`.
   scale/<photo>.json      line drawn by hand (ends in photo pixels, mm); scale/folders.json = px/mm per folder
   landmarks/<photo>.json  landmarks clicked by hand (photo pixels, annotator, date)
   models/landmarks_vN/    landmark models (+ landmarks_vN.json with landmarks, photos, SHA-256 of the weights)
+  models/outline_vN/      imported outline models (+ outline_vN.json with parts, source, SHA-256 of the weights)
   training/landmarks_dataset/  crops and labels made for the last landmark training
   export/                 measurements.csv, validation_*.csv/png
 ```

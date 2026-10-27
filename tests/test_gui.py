@@ -151,7 +151,7 @@ def test_training_screen_paints_and_trains(tmp_path, monkeypatch):
     w.pages[0].open(pr.path)
     w.nav.setCurrentRow(6)
     page = w.pages[6]
-    assert w.stack.currentIndex() == 6 and len(page.brush_group.buttons()) == 6     # 3 classes + base + reflection + eraser
+    assert w.stack.currentIndex() == 6 and len(page.brush_group.buttons()) == 5     # orange, black (iridescent is off in new projects) + base + reflection + eraser
     x0, y0 = page.current[2][:2]
     page.view.brush = 1
     page.view.dab(QPointF(800 - x0, 640 - y0), QPointF(805 - x0, 640 - y0))

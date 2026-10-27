@@ -6,7 +6,7 @@ import hashlib
 import json
 import os
 
-from . import metadata
+from . import metadata, profile
 
 PROJECT_FILE = 'project.json'
 
@@ -29,12 +29,15 @@ DEFAULT_SETTINGS = {
                'expected_ids_file': '', 'id_table_file': ''},
     # colour classes: trained model (modelli/<name>.npz, '' = off); spots closer than merge_mm count as one
     'colours': {'model': '', 'merge_mm': 0.0, 'min_spot_mm2': 0.0},
+    # optional colour classes of the profile not measured (e.g. iridescent); new projects start with them off
+    'colours_off': [],
     # what to measure on each fish: size_colour (size + colour classes) | size (size only, e.g. females).
     # Per photo: chosen by hand in Review > folder listed in size_only_folders > size_only_pattern (regex on the
     # fish id or file name) > default.
     'analysis': {'default': 'size_colour', 'size_only_folders': [], 'size_only_pattern': ''},
     'training': {'annotator': ''},
     'landmarks': {'model': ''},     # YOLO-pose model trained in screen 8 ('' = only landmarks clicked by hand)
+    'outline': {'model': ''},       # imported outline model (outline_vN); '' = zero-training detector (YOLOE + SAM)
 }
 
 # Settings that change the numbers: a change makes earlier results stale.
@@ -70,8 +73,11 @@ class Project:
         if os.path.exists(os.path.join(path, PROJECT_FILE)):
             raise FileExistsError(f'{path} already holds a project: open it instead of creating a new one.')
         os.makedirs(path, exist_ok=True)
+        settings = copy.deepcopy(DEFAULT_SETTINGS)
+        settings['colours_off'] = [c['key'] for c in profile.load(settings['profile'])['colour_classes']
+                                   if c.get('optional')]
         data = {'name': name, 'created': datetime.date.today().isoformat(),
-                'folders': [os.path.abspath(f) for f in folders], 'settings': DEFAULT_SETTINGS}
+                'folders': [os.path.abspath(f) for f in folders], 'settings': settings}
         with open(os.path.join(path, PROJECT_FILE), 'w', encoding='utf-8') as f:
             json.dump(data, f, indent=2, ensure_ascii=False)
         return cls(path)
@@ -121,6 +127,10 @@ class Project:
 
     def settings_hash(self):
         s = {k: self.settings[k] for k in ANALYSIS_KEYS}
+        if self.settings['outline'].get('model'):      # only then, so projects made before it stay current
+            s['outline'] = self.settings['outline']
+        if self.settings.get('colours_off'):
+            s['colours_off'] = sorted(self.settings['colours_off'])
         return hashlib.sha1(json.dumps(s, sort_keys=True).encode('utf-8')).hexdigest()[:12]
 
     def result_path(self, photo):

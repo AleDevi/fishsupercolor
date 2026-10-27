@@ -24,16 +24,16 @@ def export_dialog(parent, project, name):
 
 def import_dialog(parent, project, kind):
     """Returns the new model name, or None."""
-    note = ('\n\nLandmark models contain neural-network weights: import only files from people you trust.'
-            if kind == 'landmarks' else '')
+    note = ('\n\nThis model contains neural-network weights: import only files from people you trust.'
+            if kind != 'colours' else '')
     src, _ = QFileDialog.getOpenFileName(parent, 'Import model', os.path.expanduser('~'), 'Guppy Colour model (*.zip)')
     if not src:
         return None
     try:
         manifest, _ = modelshare.read_package(src)
         if manifest['kind'] != kind:
-            raise ValueError(f"this is a {manifest['kind']} model: import it in the "
-                             f"{'Training' if manifest['kind'] == 'colours' else 'Landmarks'} screen")
+            screen = {'colours': 'Training', 'landmarks': 'Landmarks', 'outline': 'Settings'}.get(manifest['kind'], '?')
+            raise ValueError(f"this is a {manifest['kind']} model: import it in the {screen} screen")
         if QMessageBox.question(parent, 'Import model', f"Import {manifest.get('name')} from project "
                                 f"“{manifest.get('project')}” ({(manifest.get('exported') or '')[:10]})?{note}") \
                 != QMessageBox.Yes:

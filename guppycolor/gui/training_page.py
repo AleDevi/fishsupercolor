@@ -135,13 +135,13 @@ class TrainWorker(QObject):
     failed = Signal(str)
     progress = Signal(int, int, str)
 
-    def __init__(self, project):
+    def __init__(self, project, start_from=None):
         super().__init__()
-        self.project = project
+        self.project, self.start_from = project, start_from
 
     def run(self):
         try:
-            name, meta = training.train(self.project, progress=self.progress.emit)
+            name, meta = training.train(self.project, progress=self.progress.emit, start_from=self.start_from)
             self.done.emit(name, meta)
         except Exception as e:
             self.failed.emit(str(e))
@@ -213,6 +213,12 @@ class TrainingPage(QWidget):
 
         mbox = QGroupBox('Model')
         ml = QVBoxLayout(mbox)
+        sf = QFormLayout()
+        self.start = QComboBox()
+        self.start.setToolTip('Ritocco: start from a colour model that keeps its training pixels (e.g. one pre-trained '
+                              'on the van der Bijl photos, imported with Import model…); your strokes count more')
+        sf.addRow('Start from', self.start)
+        ml.addLayout(sf)
         self.b_train = QPushButton('Train')
         self.b_train.clicked.connect(self.train)
         ml.addWidget(self.b_train)
@@ -266,7 +272,7 @@ class TrainingPage(QWidget):
     def show_project(self, p):
         self.project = p
         prof = profile.load(p.settings['profile'])
-        self.brushes = training.brushes(prof)
+        self.brushes = training.active_brushes(p, prof)
         self.view.colours = {b['index']: training.vis_colour(b) for b in self.brushes}
         self.build_brushes()
         self.annotator.setText(p.settings.get('training', {}).get('annotator', ''))
@@ -363,8 +369,8 @@ class TrainingPage(QWidget):
         lab = cv2.resize(lab, (bx1 - bx0, by1 - by0), interpolation=cv2.INTER_NEAREST) if s != 1 else lab
         big = np.zeros(img.shape[:2], np.uint8)
         big[by0:by1, bx0:bx1] = lab
-        base = next(b['index'] for b in self.brushes if b['key'] == 'base')
-        big[big == base] = 0
+        shown = [b['index'] for b in self.brushes if b['key'] != 'base']     # off classes count as body without colour
+        big[~np.isin(big, shown)] = 0
         self.view.set_prediction(big[y0:y1, x0:x1])
 
     def clear(self):
@@ -400,6 +406,13 @@ class TrainingPage(QWidget):
         self.model.setCurrentIndex(max(0, self.model.findData(cur)))
         self.model.blockSignals(False)
         self.describe(cur)
+        self.start.clear()
+        self.start.addItem('nothing: only my strokes', '')
+        pool = training.pool_models(self.project)
+        for name, meta in reversed(pool):
+            self.start.addItem(f"{name}  ({'imported' if meta.get('imported_from') else meta.get('date', '')[:10]})", name)
+        imported = [n for n, m in pool if m.get('imported_from')]
+        self.start.setCurrentIndex(max(0, self.start.findData(imported[-1])) if imported else 0)
 
     def describe(self, name):
         meta = dict(training.list_models(self.project)).get(name) if name else None
@@ -415,7 +428,7 @@ class TrainingPage(QWidget):
         self.save_current()
         self.b_train.setEnabled(False)
         self.b_train.setText('Training…')
-        self.worker = TrainWorker(self.project)
+        self.worker = TrainWorker(self.project, self.start.currentData() or None)
         self.thread = QThread()
         self.worker.moveToThread(self.thread)
         self.thread.started.connect(self.worker.run)
@@ -484,7 +497,8 @@ class TrainingPage(QWidget):
             return
         from .. import export
         header, rows = verify.read_table(path)
-        keys = [c['key'] for c in profile.load(p.settings['profile'])['colour_classes']]
+        off = training.classes_off(p)
+        keys = [c['key'] for c in profile.load(p.settings['profile'])['colour_classes'] if c['key'] not in off]
         app_rows, _ = export.rows(p)
         id_col, cols = verify.guess_columns(header, rows, app_rows, keys)
         dlg = QDialog(self)

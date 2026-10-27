@@ -9,7 +9,8 @@
   "colour_classes": [
     {"key": "orange", "label": "Carotenoid (yellow, orange, red)", "display": "#E8742A"},
     {"key": "black", "label": "Black", "display": "#222222"},
-    {"key": "iridescent", "label": "Iridescent (blue, violet, white, green)", "display": "#3D7FD6"}
+    {"key": "iridescent", "label": "Iridescent (blue, violet, white, green)", "display": "#3D7FD6",
+     "optional": true}
   ],
   "landmarks": [
     {"key": "snout", "label": "Snout tip", "required": true, "procrustes": true},
