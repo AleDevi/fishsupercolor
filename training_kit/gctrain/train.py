@@ -47,6 +47,17 @@ def _amp_ok(model=None):
     return torch.cuda.is_available() and torch.cuda.get_device_capability(0) >= (7, 5)
 
 
+def _here(ds):
+    """data.yaml of the dataset folder ds, its path line set to where ds is now (the kit folder may have moved)."""
+    y = os.path.join(ds, 'data.yaml')
+    with open(y, encoding='utf-8') as f:
+        lines = f.read().splitlines()
+    lines = [f'path: {json.dumps(os.path.abspath(ds))}' if l.startswith('path:') else l for l in lines]
+    with open(y, 'w', encoding='utf-8') as f:
+        f.write('\n'.join(lines) + '\n')
+    return y
+
+
 def _yolo(weights):
     from ultralytics import YOLO
     from ultralytics.engine import trainer
@@ -124,7 +135,7 @@ def train_outline(work, log, quick=False):
     m = machine()
     p = plan(m, quick)
     ds = os.path.join(work, 'outline')
-    data = os.path.join(ds, 'data.yaml')
+    data = _here(ds)
     runs = os.path.join(work, 'runs')
     base = segment.ensure_file('yolo11s-seg.pt', BASES['yolo11s-seg.pt'])
     log(f'Outline model on {m["name"]}')
@@ -159,7 +170,7 @@ def train_landmarks(work, log, quick=False):
     base = segment.ensure_file('yolo11n-pose.pt', BASES['yolo11n-pose.pt'])
     log(f'Landmark model on {m["name"]}')
     aug = dict(fliplr=0.5, degrees=10, scale=0.3, hsv_h=0.02, hsv_s=0.6, hsv_v=0.4, mosaic=0.0)
-    best = _train(base, os.path.join(ds, 'data.yaml'), os.path.join(work, 'runs'), 'landmarks', m['device'], log,
+    best = _train(base, _here(ds), os.path.join(work, 'runs'), 'landmarks', m['device'], log,
                   **p['landmarks'], **aug)
     with open(os.path.join(ds, 'keys.json'), encoding='utf-8') as f:
         keys = json.load(f)

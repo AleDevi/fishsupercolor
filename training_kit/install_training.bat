@@ -29,13 +29,22 @@ nvidia-smi >nul 2>nul && (
   echo  No NVIDIA card found: installing the processor version ^(fine for the short test, too slow for the real training^).
 )
 echo.
-if not exist "%VENV%\Scripts\python.exe" (
+rem An environment made by this installer (marker file) with Python 3.12 is updated in place; anything else is
+rem removed and made again.
+set "MARK=%VENV%\guppytraining-installed.txt"
+set "FRESH=1"
+if exist "%MARK%" if exist "%VENV%\Scripts\python.exe" "%VENV%\Scripts\python.exe" -c "import sys; sys.exit(sys.version_info[:2] != (3, 12))" >nul 2>nul && set "FRESH="
+if defined FRESH (
+  if exist "%VENV%" rmdir /s /q "%VENV%"
   %PY% -m venv "%VENV%" || goto error
+) else (
+  echo  Updating the existing environment.
 )
 set "PIPOPT=--disable-pip-version-check --no-cache-dir"
 echo  Downloading and installing the packages: 10-30 minutes. The window may stay on the same line for minutes.
 "%VENV%\Scripts\python.exe" -m pip install %PIPOPT% --require-hashes --only-binary=:all: %EXTRA% -r "%REQ%" || goto error
 "%VENV%\Scripts\python.exe" -m pip install %PIPOPT% --no-deps --no-build-isolation --force-reinstall "%APP%." || goto error
+> "%MARK%" echo Installed by install_training.bat from "%REQ%" with hash checks.
 echo.
 "%VENV%\Scripts\python.exe" -c "import torch; ok = torch.cuda.is_available(); print('  GPU OK: ' + torch.cuda.get_device_name(0) if ok else '  No GPU in use: the processor will be used.')" || goto error
 echo.
