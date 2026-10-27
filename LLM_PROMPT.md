@@ -170,6 +170,9 @@ for, how it is built, the rules every change must follow, and how to organise th
    `## X.Y.Z (YYYY-MM-DD)`, written for the user (what changes for them, what to do, e.g. "run the Analysis
    again"). Planned work goes under `## Planned`.
 3. **README.md**: update the sections the change touches (screens, CSV columns, flags, project folder, security).
+   **MODELS_AND_TRAINING.md**: update it with every change to models, training, import/export or the GuppyTraining
+   kit, and its "last update" line at every release: it is the researcher's single guide to where models are and
+   how to train and load them.
 4. **Version**: bump it in both `guppycolor/__init__.py` and `pyproject.toml` (semantic: minor for features,
    patch for fixes).
 5. **CSV for R**: never rename or remove a column silently; add new columns, keep `NA` for missing values, and

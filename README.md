@@ -22,6 +22,9 @@ are planned; photos of them can already be analysed for outline, size and colour
 - [For developers](#for-developers)
 - [What is missing](#what-is-missing)
 
+Models (which ones, where they are saved, how to load them, how to train them on each PC, the GuppyTraining
+kit): [MODELS_AND_TRAINING.md](MODELS_AND_TRAINING.md).
+
 ## Install (Windows)
 
 You need Python 3.12 from python.org (no other Python knowledge needed). Python 3.13 does not work yet: `rapidocr-onnxruntime` has no 3.13 release. Both versions can be installed side by side; the installer picks 3.12.
@@ -197,8 +200,9 @@ colour) and purple (reflection), then **Import strokes from Paint**.
    (pre-trained on about 1,600 van der Bijl 2025 photos), imported with **Import model…**. Ritocco refines it with
    your clicks in fewer rounds and with gentle steps, so a few photos adapt it to your setup without undoing what
    it learnt. Landmarks a model was never trained on (the kit's has no dorsal fin base and gonopodium base) are
-   not predicted until you click them on some photos and train again. A GPU
-   takes minutes, a CPU much longer. The new model is put in use; run the **Analysis** again to get SL (and
+   not predicted until you click them on some photos and train again. The app trains on the
+   processor (its installer does not install the graphics-card version), so give it time; the GuppyTraining kit
+   uses an NVIDIA card ([MODELS_AND_TRAINING.md](MODELS_AND_TRAINING.md)). The new model is put in use; run the **Analysis** again to get SL (and
    the landmarks) on every fish. Landmarks the model is unsure of (confidence < 0.5) are left out.
    A bar shows the training rounds; it may stop before the last one when the model no longer improves.
    **Export model… / Import model…** work as in Training (the landmarks must be the same as in the project's
