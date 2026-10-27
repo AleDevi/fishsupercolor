@@ -131,3 +131,14 @@ def test_find_annotations_in_a_subfolder(tmp_path):
     for n in ['photo_database.csv'] + list(vdb.ZIPS.values()):
         (sub / n).write_bytes(b'')
     assert vdb.find_annotations(str(tmp_path)) == str(sub)
+
+
+def test_colour_labels_use_the_profile_brushes():
+    from gctrain import colours
+    index = colours.brush_index('guppy_male')
+    assert (index['orange'], index['black'], index['base']) == (1, 2, 4)
+    fish = np.zeros((10, 10), bool); fish[2:8, 2:8] = True
+    orange = np.zeros_like(fish); orange[2:5, 2:5] = True
+    black = np.zeros_like(fish); black[4:6, 4:6] = True
+    lab = colours.labels({'fish': fish, 'orange': orange, 'black': black}, index)
+    assert lab[4, 4] == 0 and lab[2, 2] == 1 and lab[5, 5] == 2 and lab[7, 7] == 4 and lab[0, 0] == 0

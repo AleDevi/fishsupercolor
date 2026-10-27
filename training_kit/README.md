@@ -1,6 +1,6 @@
 # Guppy Colour training kit
 
-Pre-trains two Guppy Colour models on the photos and annotations of **van der Bijl et al. 2025**
+Pre-trains three Guppy Colour models on the photos and annotations of **van der Bijl et al. 2025**
 (*Nature Ecology & Evolution*; photos and annotations on FRDR, doi
 [10.20383/103.01281](https://doi.org/10.20383/103.01281), CC BY 4.0, cite the paper when you use the models):
 
@@ -8,11 +8,12 @@ Pre-trains two Guppy Colour models on the photos and annotations of **van der Bi
 | --- | --- | --- | --- |
 | Outline (YOLO-seg) | the fish in the whole photo, as two parts: **body** and **caudal fin** (also its transparent part) | `extracted_fish` (body + whole caudal fin), split at the line between landmarks 3 and 4 (start of the caudal fin) | `outline_vanderbijl.zip` |
 | Landmarks (YOLO-pose) | **snout**, **eye**, **end of the caudal peduncle**, **tail tip**, so SL and TL | `fixed_landmarks` (1 eye, 2 snout, 3-4 start of the caudal fin: their midpoint is the end of the peduncle); tail tip = point of the outline farthest from the snout | `landmarks_vanderbijl.zip` |
+| Colours (random forest, as in the Training screen) | **orange**, **black** and **body without colour** per pixel | `carotenoid_coloration` and `melanic_coloration_v2` inside `extracted_fish` (pixels in both masks left out; no colour correction: their photos have no chart) | `colours_vanderbijl.zip` |
 
 The dorsal fin and the gonopodium are not in the van der Bijl annotations: the landmark model has the
 profile's `dorsal_base` and `gonopodium_base` but never saw them, so it does not predict them. Teach them in
-Guppy Colour with your own clicks. Colour classes are trained in Guppy Colour as before (van der Bijl has no
-iridescent class); their orange and black masks are used here only to check the placement (see below).
+Guppy Colour with your own clicks. The colour model has no iridescent class (van der Bijl has none): import it in a project
+that measures orange and black, then refine it with your brush strokes (Training > Start from).
 
 It runs without Guppy Colour and without Claude, on any Windows PC with Python 3.12. An NVIDIA card makes it
 practical (hours); on the processor only the short test is reasonable.
@@ -47,11 +48,15 @@ van der Bijl folder). Unzip the kit itself to `C:\`: it makes the folder `C:\Gup
    1280 px), with colour, scale, rotation and mirror augmentation. A second round adds the 15% of training photos
    it gets most wrong and trains a little more; it is kept only if it does better on the validation photos.
 3. **Landmark model**: YOLO11n-pose (the same base as the app) on crops made exactly as the app makes them.
-4. **Check** (`gctrain/evaluate.py`) on the test photos: overlap (IoU) of fish, body and caudal fin with
+4. **Colour model** (`gctrain/colours.py`): the same pixel features and random forest (60 trees) as Guppy Colour's
+   Training screen, on 300 pixels per class from each training photo (at most 150,000 per class in all). It keeps
+   10,000 of its training pixels per class, so the app can start from it (Ritocco).
+5. **Check** (`gctrain/evaluate.py`) on the test photos: overlap (IoU) of fish, body and caudal fin with
    theirs; landmark errors, SL and TL errors as % of their SL, also apart for the photos whose landmarks they
-   placed by hand (the fairest check); the 12 worst photos drawn in `report.html`.
+   placed by hand (the fairest check); % orange and % black against their `car_perc` and `mel_perc` (bias, mean
+   absolute error, r) and pixel overlap per colour class; the 12 worst photos drawn in `report.html`.
    Their annotations are mostly made by their own model: the numbers say how close we are to them.
-5. **Model files** in `results\`, in the layout of Guppy Colour's Export model button.
+6. **Model files** in `results\`, in the layout of Guppy Colour's Export model button.
 
 If it stops (power cut, PC restarted), double-click `start_training.bat` again: finished steps are skipped and
 an interrupted training resumes from its last round.
@@ -59,7 +64,8 @@ an interrupted training resumes from its last round.
 ## Using the results in Guppy Colour
 
 - `landmarks_vanderbijl.zip`: Landmarks screen, Import model. Then refine it with your clicks.
-- `outline_vanderbijl.zip`: needs a Guppy Colour version that imports outline models (planned).
+- `outline_vanderbijl.zip`: Settings > Fish outline, Import outline model… (Guppy Colour 0.11.0 or later).
+- `colours_vanderbijl.zip`: Training screen, Import model…, then Start from it with your strokes (0.12.0 or later).
 
 ## Security
 

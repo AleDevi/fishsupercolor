@@ -133,6 +133,10 @@ def run(work, extra_folders=(), log=print):
                               else str(r[c])) for c in cols) + '\n')
     summary = summarise(rows)
     summary['manual_landmarks_only'] = summarise([r for r in rows if r['manual_landmarks']])
+    cs = os.path.join(work, 'colours', 'colour_summary.json')
+    if os.path.exists(cs):
+        with open(cs, encoding='utf-8') as f:
+            summary['colours'] = json.load(f)
     write_report(os.path.join(work, 'report.html'), summary, rows, pics, extra, om, lm)
     with open(os.path.join(work, 'summary.json'), 'w', encoding='utf-8') as f:
         json.dump(summary, f, indent=1)
@@ -174,6 +178,19 @@ def write_report(path, summary, rows, pics, extra, om, lm):
         tr.append(f'<tr><td>{label}: error as % of SL</td><td>{_fmt(s.get("median_abs"), True)}</td>'
                   f'<td>{_fmt(s.get("p90_abs"), True)} (90% of fish below)</td>'
                   f'<td>{_fmt(hand.get(k, {}).get("median_abs"), True)}</td></tr>')
+    col = summary.get('colours') or {}
+    ctr = []
+    for k, label in (('orange_vs_car_perc', '% orange vs their car_perc'), ('black_vs_mel_perc', '% black vs their mel_perc'),
+                     ('black_vs_mel_perc_v2', '% black vs their mel_perc_v2'),
+                     ('orange_vs_masks', '% orange vs their carotenoid mask'), ('black_vs_masks', '% black vs their melanic mask')):
+        s = col.get(k, {})
+        if s.get('n', 0) >= 2:
+            ctr.append(f'<tr><td>{label}</td><td>{s["n"]}</td><td>{s["bias"]:+.2f}</td><td>{s["mae"]:.2f}</td>'
+                       f'<td>{s["r"]:.3f}</td></tr>')
+    colour_html = ('<h2>Colour model (orange, black)</h2><p>Percentages of the fish area, on the test photos. Pixel overlap '
+                   f'(IoU, median): orange {_fmt(col.get("iou_orange_median"))}, black {_fmt(col.get("iou_black_median"))}.</p>'
+                   '<table><tr><th>Comparison</th><th>Fish</th><th>Bias (points)</th><th>Mean absolute error (points)</th>'
+                   f'<th>r</th></tr>{"".join(ctr)}</table>') if col else ''
     cards = ''.join(f'<figure><img src="data:image/jpeg;base64,{pics[r["uid"]]}"><figcaption>{html.escape(r["uid"])} '
                     f'IoU {r["iou_fish"]:.2f}</figcaption></figure>' for r in worst)
     ex = ''.join(f'<figure><img src="data:image/jpeg;base64,{b}"><figcaption>{html.escape(n)}</figcaption></figure>'
@@ -190,6 +207,7 @@ we are to them, not how close to perfect.</p>
 <p>Last column: only the {hand.get('photos', 0)} test photos whose landmarks van der Bijl placed by hand, the fairest check of
 the landmarks, SL and TL.</p>
 <table><tr><th>Measure</th><th>Typical (median)</th><th>Spread</th><th>Typical, hand-placed landmarks</th></tr>{''.join(tr)}</table>
+{colour_html}
 <h2>The 12 test photos with the lowest overlap</h2>
 <p>Magenta: our body; orange: our caudal fin; thin green: van der Bijl's fish; red dots: our landmarks.</p>{cards}
 <h2>Other photos (no annotations: judge by eye)</h2>{ex or '<p>None given.</p>'}
