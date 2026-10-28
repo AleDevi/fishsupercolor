@@ -19,6 +19,16 @@
 - Verified update from GitHub releases (off while the repository is private).
 - Landmark model export as plain tensors (safetensors/npz) rebuilt locally on import, so a shared file never goes through an unpickler (security review suggestion).
 
+## Unreleased
+- New `training_kit/` (separate from the app, not in its release zip): standalone pre-training on a PC with an
+  NVIDIA card, without Guppy Colour or Claude installed. It places the van der Bijl et al. 2025 annotations (FRDR,
+  CC BY 4.0) on their original photos and trains an outline model (body + caudal fin) and a landmark model (snout,
+  eye, end of the peduncle, tail tip, so SL and TL), checks both on held-out fish against their annotations
+  (`report.html`) and writes model files in the app's export format. See `training_kit/README.md` and
+  `MODELS_AND_TRAINING.md`. Kit 0.2.0 adds a colour model (orange, black, body without colour) from the van der
+  Bijl masks, `colours_vanderbijl.zip`, to import in Training and refine with Ritocco; kit 0.2.1 reinstalls its
+  packages when the kit folder is new and finds its data after the folder is moved. Use 0.2.1, not 0.2.0.
+
 ## 0.12.0 (2026-10-27)
 - **Optional colour classes**: the iridescent class is now optional (`"optional": true` in the profile). Settings >
   What to measure > *Measure the colour class Iridescent* switches it on or off. New projects start with it off;

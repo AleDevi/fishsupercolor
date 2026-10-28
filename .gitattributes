@@ -8,3 +8,4 @@ tests/data/** export-ignore
 tools export-ignore
 AGENTS.md export-ignore
 CLAUDE.md export-ignore
+training_kit export-ignore

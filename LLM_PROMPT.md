@@ -88,11 +88,11 @@ for, how it is built, the rules every change must follow, and how to organise th
 
 #### Recent versions (CHANGELOG)
 
+- **Unreleased**: New `training_kit/` (separate from the app, not in its release zip): standalone…
 - **0.12.0 (2026-10-27)**: Optional colour classes: the iridescent class is now optional (`"optional": true` in the…; Ritocco for colour models: Training > Start from: a colour model that keeps its training…; Import model (colours) accepts a model with only some of the project's classes (e.g.…; New guide `MODELS_AND_TRAINING.md`: which models exist, where they are saved, which file…
 - **0.11.0 (2026-10-26)**: Outline models: Settings > Fish outline can use an imported outline model instead of the…; Ritocco: Landmarks > Start from: training can start from a landmark model of the project…; Landmark models can say which landmarks they were never trained on (the training kit's…; Export / Import model works for outline models too.
 - **0.10.0 (2026-10-23)**: Landmarks win over the outline (new module `sizes.py`), as soon as they are clicked on…; Review shows each photo in separate views, Fish (outline and measures), Label (the label…; Add to the outline is now a click mode in the Fish view ("A click on the fish: redoes the…
 - **0.9.0 (2026-10-23)**: Results: the table now has `standard_length_mm` and `total_length_mm`; Fixed: on photos with the fish upright (head up or down) the "head on the left/right"…; Training and Landmarks screens: the crop around the fish leaves more room at the head and…
-- **0.8.2 (2026-10-23)**: Fixed: landmark training stopped with "'NoneType' object has no attribute 'write'" when…
 
 #### Planned (CHANGELOG)
 
@@ -158,7 +158,7 @@ for, how it is built, the rules every change must follow, and how to organise th
 
 #### Tests
 
-- `test_app.py` (20), `test_gui.py` (5), `test_labels.py` (8), `test_landmarks.py` (17), `test_modelshare.py` (3), `test_outline.py` (5), `test_pattern.py` (8), `test_training.py` (10).
+- `test_app.py` (20), `test_gui.py` (5), `test_labels.py` (8), `test_landmarks.py` (17), `test_modelshare.py` (3), `test_outline.py` (5), `test_pattern.py` (8), `test_training.py` (10), `test_training_kit.py` (10).
 
 <!-- AUTO:END -->
 
