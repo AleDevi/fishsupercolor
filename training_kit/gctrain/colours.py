@@ -25,7 +25,7 @@ KEYS = ('orange', 'black', 'base')
 PER_PHOTO = 300             # training pixels per class and photo
 PER_CLASS = 150000          # training pixels per class in all (class-balanced sample)
 TREES = 60
-METHOD = 2                  # 1: kit 0.2.0-0.2.1 (classes balanced); 2: weighted to their true share
+METHOD = 3                  # 1: kit 0.2.0-0.2.1 (classes balanced); 2: weighted to their true share; 3: + class_share
 SOURCE = 'van der Bijl et al. 2025, Nature Ecology & Evolution; data FRDR doi 10.20383/103.01281 (CC BY 4.0)'
 
 
@@ -172,7 +172,8 @@ def run(work, annotations, photos, log=print, profile_name='guppy_male', workers
         'annotator': 'van der Bijl 2025 masks', 'profile': profile_name, 'features_version': pixels.FEATURES_VERSION,
         'classes': [{k: names[c][k] for k in ('index', 'key', 'label', 'display')} for c in KEYS],
         'photos': sorted(used), 'pixels_per_class': {c: int((y == index[c]).sum()) for c in KEYS},
-        'pool_pixels': int(len(pool_keep)), 'source': SOURCE, 'colour_correction': 'none (no chart in the photos)',
+        'pool_pixels': int(len(pool_keep)),
+        'class_share': {c: round(float(prior[index[c]]), 6) for c in KEYS}, 'source': SOURCE, 'colour_correction': 'none (no chart in the photos)',
         'trained_with': {'trees': TREES, 'depth': 14, 'pixels_per_photo_and_class': PER_PHOTO,
                          'pixels_per_class': PER_CLASS,
                          'class_weights': 'true share of the fish', 'method': METHOD},
