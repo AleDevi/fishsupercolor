@@ -317,3 +317,30 @@ def test_landmark_outside_the_outline_grows_it():
     # a landmark just off the edge (a click on the outline) changes nothing
     mask, used = pipeline.guide_outline(img, body, {'snout': (48.0, 100.0)}, grow=grow)
     assert used == [] and mask is body
+
+
+def test_gpu_lock_differs_from_the_processor_lock_only_in_torch():
+    """requirements-win-cuda.txt (installed with an NVIDIA card) must pin the same packages as requirements-win.txt,
+    with only torch and torchvision swapped for their CUDA builds."""
+    import re
+    root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+    def pins(name):
+        with open(os.path.join(root, name), encoding='utf-8') as f:
+            return dict(re.findall(r'^([A-Za-z0-9_.-]+)==(\S+)', f.read(), re.M))
+    cpu, gpu = pins('requirements-win.txt'), pins('requirements-win-cuda.txt')
+    assert set(cpu) == set(gpu)
+    assert {k for k in cpu if cpu[k] != gpu[k]} == {'torch', 'torchvision'}
+    assert all(gpu[k] == cpu[k] + '+cu130' for k in ('torch', 'torchvision'))
+
+
+def test_neural_networks_fall_back_to_the_processor():
+    from guppycolor.engine import segment
+    segment._device = None
+    try:
+        import torch
+        has_gpu = torch.cuda.is_available()
+    except ImportError:
+        has_gpu = False
+    if not has_gpu:
+        assert segment.device() == 'cpu' and 'processor' in segment.device_text()

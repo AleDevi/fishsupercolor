@@ -634,6 +634,7 @@ class Worker(QObject):
     progress = Signal(int, int, dict)
     finished = Signal(int)
     failed = Signal(str)
+    device = Signal(str)
 
     def __init__(self, project):
         super().__init__()
@@ -642,6 +643,8 @@ class Worker(QObject):
 
     def run(self):
         try:
+            from ..engine import segment
+            self.device.emit(segment.device_text())
             n = pipeline.run(self.project, progress=lambda i, n, r: self.progress.emit(i, n, r), stop=lambda: self.stop)
         except Exception as e:      # models missing or not the expected files, no internet on first run
             self.failed.emit(f'{type(e).__name__}: {e}')
@@ -671,6 +674,8 @@ class AnalysisPage(QWidget):
         lay.addWidget(self.bar)
         self.status = note('')
         lay.addWidget(self.status)
+        self.runs_on = note('')
+        lay.addWidget(self.runs_on)
         lay.addWidget(note('The first run downloads and verifies the models (about 830 MB, once, needs internet). '
                            'You can stop and resume: photos already done are not redone.'))
         self.grid = QListWidget()
@@ -718,6 +723,8 @@ class AnalysisPage(QWidget):
         self.worker.progress.connect(self.on_progress)
         self.worker.finished.connect(self.on_finished)
         self.worker.failed.connect(self.on_failed)
+        self.worker.device.connect(lambda t: self.runs_on.setText(f'Runs on: {t}.'))
+        self.seconds = []
         self.thread.start()
 
     def halt(self):
@@ -730,6 +737,11 @@ class AnalysisPage(QWidget):
         self.bar.setValue(i)
         self.add_thumb(r)
         self.update_counts()
+        if r.get('seconds'):
+            self.seconds.append(float(r['seconds']))
+            left = (n - i) * float(np.median(self.seconds)) / 60
+            self.runs_on.setText(self.runs_on.text().split(' · ')[0] + f' · {np.median(self.seconds):.1f} s per photo'
+                                 + (f' · about {left:.0f} min left' if i < n else ''))
 
     def on_failed(self, msg):
         QMessageBox.critical(self, 'Analysis', 'Analysis not started.\n\n' + msg)

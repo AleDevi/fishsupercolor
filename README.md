@@ -33,6 +33,13 @@ You need Python 3.12 from python.org (no other Python knowledge needed). Python 
 2. Double-click `install_windows.bat`. It takes a few minutes and needs internet.
 3. The **Guppy Colour** icon appears on the desktop. The unzipped folder is not needed after this.
 
+**NVIDIA graphics card.** On a PC with an NVIDIA card the installer finds it and installs the version of PyTorch
+(the neural-network library) that uses it: the fish outline (YOLOE + SAM, or an outline model), the landmarks and
+landmark training then run on the card, several times faster than on the processor. It downloads about 2.5 GB more
+and needs an up-to-date NVIDIA driver. At the end the installer says `GPU OK: <card>`; 3 Analysis says *Runs on:*
+and the seconds per photo. A card too old for it (e.g. a GT 750M) is not used: the processor does the work, as on a
+PC without a card. Colours and label reading always run on the processor (they are fast).
+
 The first analysis downloads the fish-finding models (about 830 MB, once) into
 `C:\Users\<you>\.guppycolor\models` and checks them. If the icon does not open, run `start_guppycolour.bat`:
 it shows the error messages. When opened from the icon, the technical messages (for example the progress of
@@ -42,7 +49,7 @@ that file along when something goes wrong.
 To update, unzip the new version and run `install_windows.bat` again. Projects are kept. The update reuses the
 installed packages: only the app itself and any package whose version changed are downloaded.
 
-**Disk space.** What the app keeps: `%LOCALAPPDATA%\GuppyColour\venv` (Python packages, about 1.5 GB) and
+**Disk space.** What the app keeps: `%LOCALAPPDATA%\GuppyColour\venv` (Python packages, about 1.5 GB; about 4 GB with an NVIDIA card) and
 `C:\Users\<you>\.guppycolor\models` (models, about 830 MB, downloaded once). Safe to delete: old
 `GuppyColour_*.zip` files and their unzipped folders, and the pip cache left by versions before 0.6.1
 (`py -3.12 -m pip cache purge`, or delete `%LOCALAPPDATA%\pip\Cache`). The installer no longer fills that cache.
@@ -362,7 +369,9 @@ The whole folder can be copied to another computer (e.g. one with a GPU) and ope
 ## Security
 
 - Python packages come from `requirements-win.txt`: fixed versions, each with its SHA-256 hash, binary wheels
-  only. A different file stops the installation.
+  only. A different file stops the installation. With an NVIDIA card the installer uses `requirements-win-cuda.txt`
+  instead: the same file with torch and torchvision swapped for their CUDA builds, hash-checked too, downloaded from
+  PyTorch's own index (`download.pytorch.org/whl/cu130`), the same file as the GuppyTraining kit.
 - The model files are checked against their SHA-256 before being opened; ultralytics loads them with
   `weights_only` and never installs packages or sends usage statistics.
 - Landmark models trained in the app are checked against the SHA-256 written when they were trained before
@@ -401,6 +410,8 @@ guppycolor run PROJECT           analyse pending photos and write export/measure
   every push to `main`.
 - Dependencies: edit `requirements.in`, then
   `uv pip compile requirements.in --python-platform windows --python-version 3.12 --generate-hashes -o requirements-win.txt`.
+  Then make `requirements-win-cuda.txt` from it: the same pins, with torch and torchvision as `+cu130` and the
+  hashes of those wheels from `https://download.pytorch.org/whl/cu130` (a test checks that only these two differ).
 
 ## What is missing
 

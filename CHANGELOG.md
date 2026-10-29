@@ -32,6 +32,16 @@
   that share in the model (`class_share`, used by app 0.13.0 Ritocco) and teaches the landmark model the top and
   bottom of the caudal fin base. Use the latest kit.
 
+## 0.14.0 (2026-10-29)
+- **The app uses an NVIDIA graphics card**: on a PC with one, `install_windows.bat` now installs the version of
+  PyTorch that uses the card (CUDA 13.0, `requirements-win-cuda.txt`, the same hash-locked file as GuppyTraining). The
+  fish outline, the landmarks and landmark training run on the card, several times faster. To get it on a PC that
+  has the app already: unzip 0.14.0 and run `install_windows.bat` again (about 2.5 GB more to download). PCs without
+  a card, or with a card too old for it, keep using the processor as before. Results are the same either way (tiny
+  differences in the outline edge are possible); no new analysis is needed.
+- 3 Analysis says where it runs (*Runs on: graphics card …* or *processor*), the seconds per photo and the minutes
+  left.
+
 ## 0.13.0 (2026-10-29)
 After installing, **run the Analysis again**: every photo is analysed once more because SL, TL and the colours are
 measured in a new way (outlines redone by hand, clicked landmarks, typed ids and Review decisions are kept).

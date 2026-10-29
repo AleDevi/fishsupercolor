@@ -85,6 +85,30 @@ def local_fonts():
             shutil.copyfile(src, dest)
 
 
+_device = None
+def device():
+    """0 (the first NVIDIA graphics card) when PyTorch was installed for it and a small sum works on the card, else
+    'cpu'. Checked once: an old card the installed PyTorch cannot drive falls back to the processor."""
+    global _device
+    if _device is None:
+        _device = 'cpu'
+        try:
+            import torch
+            if torch.cuda.is_available() and float((torch.ones(4, device='cuda') * 2).sum().item()) == 8.0:
+                _device = 0
+        except Exception:
+            pass
+    return _device
+
+
+def device_text():
+    """Plain words for the screens: where the neural networks run."""
+    if device() == 'cpu':
+        return 'processor (no NVIDIA graphics card in use)'
+    import torch
+    return f'graphics card {torch.cuda.get_device_name(0)}'
+
+
 _det = None; _sam = None
 def models(sam='sam2.1_b.pt'):
     global _det, _sam
@@ -100,10 +124,10 @@ def segment_fish(img, work=1600):
     det, sam = models()
     h, w = img.shape[:2]; s = work / max(h, w)
     small = cv2.resize(img, (int(w*s), int(h*s)), interpolation=cv2.INTER_AREA)
-    r = det.predict(small[..., ::-1], conf=0.02, verbose=False)[0]
+    r = det.predict(small[..., ::-1], conf=0.02, verbose=False, device=device())[0]
     if len(r.boxes) == 0: return None, None, 0
     i = int(r.boxes.conf.argmax()); box = r.boxes.xyxy[i].cpu().numpy(); conf = float(r.boxes.conf[i])
-    m = sam.predict(small[..., ::-1], bboxes=[box.tolist()], verbose=False)[0].masks.data[0].cpu().numpy()
+    m = sam.predict(small[..., ::-1], bboxes=[box.tolist()], verbose=False, device=device())[0].masks.data[0].cpu().numpy()
     m = cv2.resize(m.astype(np.uint8), (w, h), interpolation=cv2.INTER_NEAREST).astype(bool)
     return m, box / s, conf
 
@@ -114,7 +138,7 @@ def segment_fish_click(img, x, y, work=1600, more=()):
     h, w = img.shape[:2]; s = work / max(h, w)
     small = cv2.resize(img, (int(w*s), int(h*s)), interpolation=cv2.INTER_AREA)
     pts = [[x*s, y*s]] + [[px*s, py*s] for px, py in more]
-    m = sam.predict(small[..., ::-1], points=[pts], labels=[[1]*len(pts)], verbose=False)[0].masks.data[0].cpu().numpy()
+    m = sam.predict(small[..., ::-1], points=[pts], labels=[[1]*len(pts)], verbose=False, device=device())[0].masks.data[0].cpu().numpy()
     return cv2.resize(m.astype(np.uint8), (w, h), interpolation=cv2.INTER_NEAREST).astype(bool)
 
 

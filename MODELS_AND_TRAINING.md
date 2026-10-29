@@ -2,7 +2,7 @@
 
 One page for every model Guppy Colour uses: which ones exist, where they are saved, where to load them in the
 app, where to find the ones already trained, and how to train new ones on the app or with the **GuppyTraining**
-kit. Updated with every release (last update: app 0.13.0, GuppyTraining 0.3.0).
+kit. Updated with every release (last update: app 0.14.0, GuppyTraining 0.3.0).
 
 - [In short: what to use today](#in-short-what-to-use-today)
 - [The four kinds of model](#the-four-kinds-of-model)
@@ -87,12 +87,14 @@ The report of that training (`report.html`) and the test on our photos (`prova_f
 | PC | Graphics card | Use it for |
 | --- | --- | --- |
 | Work PC (app + Claude) | none usable for training | the app: analysis, review, clicks and brush strokes, colour training, landmark Ritocco (slower without GPU: let it run) |
-| Lab PC with the RTX 4070 | NVIDIA, 12 GB | GuppyTraining (about 1.5 h for the full run); the app works there too |
+| Lab PC with the RTX 4070 | NVIDIA, 12 GB | GuppyTraining (about 1.5 h for the full run); the app too, on the card since 0.14.0: the fastest PC for big batches and landmark training |
 | Home PC | GT 750M, too old: processor only | the app; GuppyTraining only for `quick_test.bat` |
 
-Colour training never needs a graphics card. The app itself runs on the processor on every PC (its installer
-installs the processor version of the neural-network library), so landmark training in the app is slow but works
-everywhere: start it and let it run. Only GuppyTraining installs the version that uses the NVIDIA card.
+Colour training never needs a graphics card. Since app 0.14.0 the app's installer, like GuppyTraining's, installs
+the version of the neural-network library that uses an NVIDIA card when the PC has one: there the outline, the
+landmarks and landmark training run on the card (3 Analysis says *Runs on:*). Everywhere else they run on the
+processor: slower, but they work: start the training and let it run. A PC that had the app before 0.14.0 gets the
+card version by running the new `install_windows.bat`.
 
 ## Training in the app (any PC)
 

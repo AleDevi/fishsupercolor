@@ -14,6 +14,7 @@ import cv2
 import numpy as np
 
 from . import pipeline, profile
+from .engine import segment
 
 SL_FROM, SL_TO = 'snout', 'peduncle_end'
 BASE = 'yolo11n-pose.pt'                    # starting weights, checked by engine/segment.ensure_weights
@@ -163,7 +164,6 @@ def train(project, epochs=150, imgsz=640, progress=None, start_from=None):
     """Train a YOLO-pose model on the clicked landmarks. GPU used when present. Returns (name, meta).
     start_from: a landmark model of the project (e.g. one pre-trained on many photos and imported) that the clicks
     refine ("Ritocco") instead of starting from the general yolo11n-pose: fewer rounds, its image size."""
-    from .engine import segment
     import hashlib
     prof = profile.load(project.settings['profile'])
     keys = [l['key'] for l in landmark_list(prof)]
@@ -189,7 +189,6 @@ def train(project, epochs=150, imgsz=640, progress=None, start_from=None):
         untrained = set(keys)
     segment.configure_ultralytics()
     from ultralytics import YOLO
-    import torch
     nums = [int(re.findall(r'v(\d+)', m)[-1]) for m, _ in list_models(project)]
     name = f'landmarks_v{max(nums, default=0) + 1}'
     model = YOLO(base)
@@ -201,14 +200,14 @@ def train(project, epochs=150, imgsz=640, progress=None, start_from=None):
     gentle = dict(optimizer='AdamW', lr0=0.0005, warmup_epochs=0, freeze=10, nbs=8, patience=20) if start_from else \
         dict(patience=40)
     model.train(data=yaml, epochs=epochs, imgsz=imgsz, batch=8, workers=0, fliplr=0.0, mosaic=0.0, amp=False,
-                device=0 if torch.cuda.is_available() else 'cpu', project=project.dir('models'), name=name,
+                device=segment.device(), project=project.dir('models'), name=name,
                 exist_ok=True, plots=False, verbose=False, **gentle)
     w = model_weights(project, name)
     with open(w, 'rb') as f:
         sha = hashlib.sha256(f.read()).hexdigest()
     meta = {'name': name, 'date': datetime.datetime.now().isoformat(timespec='minutes'),
             'annotator': project.settings.get('training', {}).get('annotator', ''), 'keys': keys, 'photos': n,
-            'gpu': torch.cuda.is_available(), 'sha256': sha, 'imgsz': imgsz,
+            'gpu': segment.device() != 'cpu', 'sha256': sha, 'imgsz': imgsz,
             'not_trained': [k for k in keys if k in untrained and k not in clicked]}
     if start_from:
         meta['started_from'] = start_from
@@ -226,7 +225,6 @@ def load_model(project, name):
     if key not in _cache:
         if hashlib.sha256(open(w, 'rb').read()).hexdigest() != meta.get('sha256'):
             raise ValueError(f'{name}: the model file differs from the one trained, not used')
-        from .engine import segment
         segment.configure_ultralytics()
         from ultralytics import YOLO
         _cache.clear()
@@ -239,7 +237,7 @@ def predict(project, name, img, mask):
     """{key: [x, y]} in photo pixels for landmarks predicted with confidence >= MIN_CONF."""
     model, keys, meta = load_model(project, name)
     x0, y0, x1, y1 = crop_box(mask, img.shape)
-    r = model.predict(img[y0:y1, x0:x1, ::-1], imgsz=int(meta.get('imgsz', 640)), verbose=False, conf=0.1)[0]
+    r = model.predict(img[y0:y1, x0:x1, ::-1], imgsz=int(meta.get('imgsz', 640)), verbose=False, conf=0.1, device=segment.device())[0]
     if r.keypoints is None or len(r.boxes) == 0:
         return {}
     i = int(r.boxes.conf.argmax())

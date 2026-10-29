@@ -10,6 +10,8 @@ import re
 import cv2
 import numpy as np
 
+from .engine import segment
+
 MIN_CONF = 0.25
 JOIN_PX = 15        # a part counts as the fish's when it touches the body (after a dilation of this many pixels)
 
@@ -41,7 +43,6 @@ def load_model(project, name):
         with open(w, 'rb') as f:
             if hashlib.sha256(f.read()).hexdigest() != meta.get('sha256'):
                 raise ValueError(f'{name}: the model file differs from the one imported, not used')
-        from .engine import segment
         segment.configure_ultralytics()
         from ultralytics import YOLO
         _cache.clear()
@@ -74,7 +75,7 @@ def predict(project, name, img):
     long_side = int(meta.get('long_side', 1280))
     s = min(1.0, long_side / max(h, w))
     small = cv2.resize(img, (int(round(w * s)), int(round(h * s))), interpolation=cv2.INTER_AREA) if s < 1 else img
-    r = model.predict(small[..., ::-1], imgsz=int(meta.get('imgsz', 1024)), conf=MIN_CONF, retina_masks=True,
+    r = model.predict(small[..., ::-1], imgsz=int(meta.get('imgsz', 1024)), conf=MIN_CONF, retina_masks=True, device=segment.device(),
                       verbose=False)[0]
     if r.masks is None or len(r.boxes) == 0:
         return {}, 0.0
