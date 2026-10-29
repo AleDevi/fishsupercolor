@@ -97,6 +97,10 @@ def fit_colour_classes(arrays, meta, pool, mine):
     if len(set(theirs)) < 2 or not set(theirs) <= set(index):
         raise ValueError('the colour classes of this model (' + ', '.join(map(str, theirs)) + ') are not among the '
                          'ones of this project (' + ', '.join(index) + ')')
+    share = meta.get('class_share')
+    if share is not None and not (isinstance(share, dict) and set(share) <= set(theirs) and all(
+            isinstance(v, (int, float)) and 0 <= v <= 1 for v in share.values())):
+        raise ValueError('the colour model is damaged (class shares)')
     remap = np.zeros(256, np.uint8)
     for c in classes:
         remap[int(c['index'])] = index[c['key']]

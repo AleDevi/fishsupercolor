@@ -186,6 +186,20 @@ def pool_models(project):
     return out
 
 
+def class_share(meta, active, y):
+    """{brush index: share of the fish} from the start model's class_share (true proportions, e.g. measured on the
+    van der Bijl masks), for the classes in y. A class it does not know (e.g. iridescent painted only here) gets the
+    median share of its colour classes. {} when the start model has no shares (the classes stay balanced)."""
+    known = meta.get('class_share') or {}
+    if not known:
+        return {}
+    colour = [v for k, v in known.items() if k not in ('base', 'reflection')]
+    fill = float(np.median(colour)) if colour else min(known.values())
+    out = {c['index']: float(known.get(c['key'], fill)) for c in active if c['index'] in set(np.unique(y).tolist())}
+    total = sum(out.values())
+    return {k: v / total for k, v in out.items()} if total > 0 else {}
+
+
 def _sample(y, per_class, seed=0):
     rng = np.random.default_rng(seed)
     keep = []
@@ -238,6 +252,9 @@ def train(project, progress=None, start_from=None):
         own, w = np.concatenate([own, np.zeros(len(py), bool)]), np.concatenate([w, np.ones(len(py), np.float32)])
     if len(np.unique(y)) < 2:
         raise ValueError('Strokes of at least two different brushes are needed.')
+    share = class_share(dict(list_models(project)).get(start_from, {}) if start_from else {}, active, y)
+    if share:              # the forest balances the classes: weighting by their true share brings it back
+        w = w * np.array([share.get(int(k), 1.0) for k in range(256)], np.float32)[y]
     forest = pixels.Forest.train(X, y, trees=trees, sample_weight=w, progress=progress and (
         lambda k, n: progress(len(data) + k, total, f'Growing the forest: {k} of {n} trees')))
     n = len(list_models(project)) and max(int(re.findall(r'v(\d+)', m)[-1]) for m, _ in list_models(project))
@@ -251,6 +268,8 @@ def train(project, progress=None, start_from=None):
         'photos': used, 'pixels_per_class': {c['key']: int((y[own] == c['index']).sum()) for c in active},
         'started_from': start_from or '', 'pool_pixels': int(len(keep)),
     })
+    if share:
+        forest.meta['class_share'] = {c['key']: round(share[c['index']], 5) for c in active if c['index'] in share}
     forest.save(os.path.join(models_dir(project), name + '.npz'),
                 pool={'pool_X': X[keep], 'pool_y': y[keep], 'pool_own': own[keep]})
     return name, forest.meta

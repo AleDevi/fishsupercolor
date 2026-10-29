@@ -268,3 +268,23 @@ def test_colours_start_behind_the_eye(spotted):
     prof = dict(profile.load('guppy_male'))
     prof.pop('colour_start')
     assert sizes.colour_start(r, r['landmarks'], prof, PX_PER_MM) is None
+
+
+def test_ritocco_keeps_the_true_share_of_each_class():
+    active = [{'index': 1, 'key': 'orange'}, {'index': 2, 'key': 'black'}, {'index': 3, 'key': 'iridescent'},
+              {'index': 4, 'key': 'base'}]
+    y = np.array([1, 2, 3, 4], np.uint8)
+    share = training.class_share({'class_share': {'orange': 0.06, 'black': 0.04, 'base': 0.9}}, active, y)
+    assert share[4] > 0.8 and share[3] == pytest.approx(share[1] * 0.05 / 0.06, rel=1e-6)    # median of 0.06, 0.04
+    assert abs(sum(share.values()) - 1) < 1e-9
+    assert training.class_share({}, active, y) == {}
+    # a forest weighted by the shares calls an ambiguous pixel 'base', a balanced one 'orange'
+    rng = np.random.default_rng(0)
+    X = np.r_[rng.normal(0, 1, (2000, 3)), rng.normal(1, 1, (2000, 3))].astype(np.float32)
+    yy = np.r_[np.full(2000, 4), np.full(2000, 1)].astype(np.uint8)
+    mid = np.full((200, 3), 0.5, np.float32) + rng.normal(0, 0.05, (200, 3)).astype(np.float32)
+    w = np.where(yy == 1, 0.06, 0.9).astype(np.float32)
+    weighted = pixels.Forest.train(X, yy, trees=20, sample_weight=w)
+    balanced = pixels.Forest.train(X, yy, trees=20)
+    orange = lambda f: (f.classes[f.predict_proba(mid).argmax(1)] == 1).mean()
+    assert orange(weighted) < orange(balanced) and orange(weighted) < 0.2
