@@ -143,7 +143,7 @@ def import_model(project, path):
         return name, forest.meta
     if kind == 'landmarks':
         keys = [l['key'] for l in landmarks.landmark_list(prof)]
-        if meta.get('keys') != keys:
+        if not meta.get('keys') or not set(meta['keys']) <= set(keys):     # some may be missing (not predicted)
             raise ValueError('the landmarks of this model (' + ', '.join(map(str, meta.get('keys') or [])) + ') differ '
                              'from the ones of this project (' + ', '.join(keys) + ')')
         existing = landmarks.list_models(project)

@@ -18,7 +18,9 @@
     {"key": "eye", "label": "Eye centre", "required": false, "procrustes": true},
     {"key": "dorsal_base", "label": "Anterior base of the dorsal fin", "required": true, "procrustes": true},
     {"key": "gonopodium_base", "label": "Base of the gonopodium", "required": false, "procrustes": false},
-    {"key": "peduncle_end", "label": "End of the caudal peduncle", "required": true, "procrustes": true},
+    {"key": "caudal_base_top", "label": "Top of the caudal fin base (where the upper fin rays start)", "required": false, "procrustes": false},
+    {"key": "peduncle_end", "label": "End of the caudal peduncle (on the midline, where the fin rays start)", "required": true, "procrustes": true},
+    {"key": "caudal_base_bottom", "label": "Bottom of the caudal fin base (where the lower fin rays start)", "required": false, "procrustes": false},
     {"key": "tail_tip", "label": "Tail tip", "required": false, "procrustes": false}
   ]
 }

@@ -308,7 +308,7 @@ def read_labels(image_path, expected_ids=None, patterns=None, id_table=None):
             c = crop(src, r)
             if min(c.shape[:2]) < 8: continue
             crops += [c, cv2.rotate(c, cv2.ROTATE_180)]; owner += [(i, 0), (i, 1)]
-    lines, used = {}, {}
+    lines, used, cands = {}, {}, []
     if crops:
         per = {}                     # (line, flip) -> [(P, alphabet, free text, conf)]: original + clean x models
         for outs, o in zip(char_probs(crops), owner):
@@ -336,7 +336,7 @@ def read_labels(image_path, expected_ids=None, patterns=None, id_table=None):
             if alt > 0.5*c: c *= 1 - (alt - 0.5*c)/c   # a close runner-up lowers the confidence
             return c, t, i
         fits = {key: fit_lines([(None, pattern_slots(pat))]) for key, pat in pats.items()}
-        cands = list(fits.get('male_id') or [])
+        cands += fits.get('male_id') or []
         taken = set()
         for key in sorted(fits, key=lambda k: -(fits[k][0][0] if fits[k] else 0)):   # surest field first
             cand = [x for x in fits[key] if x[2] not in taken]

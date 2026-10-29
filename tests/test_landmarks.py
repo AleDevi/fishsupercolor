@@ -1,6 +1,9 @@
 import csv
 import os
 
+import numpy as np
+import pytest
+
 os.environ.setdefault('QT_QPA_PLATFORM', 'offscreen')
 from conftest import PX_PER_MM, stub_segmenter
 
@@ -128,9 +131,12 @@ def test_review_confirm_and_calibrate(photos, monkeypatch):
     monkeypatch.setattr(cal.CalibrateDialog, 'exec', lambda self: True)
     monkeypatch.setattr(cal.CalibrateDialog, 'result_line',
                         lambda self: ((100, 500), (100 + 20 * PX_PER_MM, 500), 20.0, False))
+    shown = page.current()['path']
     page.start_calibration()
-    assert len(page.items) == 2
+    assert len(page.items) == 3 and page.current()['path'] == shown     # stays on the photo after the scale
     assert p.results()[0]['scale_source'] == 'line'
+    page.show_project(p)
+    assert len(page.items) == 2                                          # gone once Review is opened again
 
 
 def test_calibrate_dialog(photos):
@@ -299,3 +305,39 @@ def test_clicked_landmarks_update_sizes_without_new_analysis(photos):
     landmarks.save(p, photo, {})
     r = p.load_result(photo)
     assert r['depth_source'] == 'outline' and 'standard_length_px' not in r and 'landmarks' not in r
+
+
+def test_standard_length_follows_a_bent_fish_and_tl_adds_the_tail():
+    import cv2
+    from guppycolor import sizes
+    # a fish bent like an arc: midline on a circle of radius 400 px, 90 degrees long
+    ang = np.linspace(np.pi, np.pi / 2, 200)
+    mid = np.c_[500 + 400 * np.cos(ang), 500 - 400 * np.sin(ang)]
+    snout, ped, tip = mid[0], mid[150], mid[199]
+    m = np.zeros((1000, 1000), np.uint8)
+    cv2.polylines(m, [mid.astype(np.int32)], False, 1, 40)
+    mask = m > 0
+    r = {'outline': {'midline': mid[::5].tolist(), 'fin_found': True}}
+    sizes.update(r, mask, {'snout': snout.tolist(), 'peduncle_end': ped.tolist(), 'tail_tip': tip.tolist()}, [])
+    arc = lambda i, j: 400 * (ang[i] - ang[j])
+    assert abs(r['standard_length_px'] - arc(0, 150)) / arc(0, 150) < 0.01         # along the fish, not the chord
+    assert r['standard_length_px'] > np.hypot(*(ped - snout)) * 1.02
+    assert r['total_length_px'] == pytest.approx(r['standard_length_px'] + r['caudal_length_px'], abs=0.2)
+    # a straight fish with landmarks a little off the midline: no detour
+    line = np.c_[np.linspace(100, 700, 60), np.full(60, 300.0)]
+    r = {'outline': {'midline': line.tolist()}}
+    sizes.update(r, None, {'snout': [100, 292], 'peduncle_end': [600, 292]}, [])
+    assert r['standard_length_px'] == pytest.approx(500, abs=0.5)
+
+
+def test_body_ends_on_the_arc_through_the_caudal_base():
+    from guppycolor import sizes
+    # peduncle landmark at (500, 300), caudal fin base 10 px before it at 30 px above and below: a rounded end
+    ahead, arc = sizes.body_end([500, 300], [1, 0], top=[490, 270], bottom=[490, 330])
+    assert ahead(0, 0) and not ahead(1, 0)                      # through the peduncle landmark
+    assert ahead(-10.5, -30) and not ahead(-9.5, -30)           # through the top of the fin base
+    assert ahead(-10.5, 30) and not ahead(-9.5, 30)             # and its bottom
+    assert ahead(-5, 0) and not ahead(-5, 29)                   # body behind the chord, in the middle only
+    assert len(arc) == 15
+    flat, none = sizes.body_end([500, 300], [1, 0])
+    assert flat(0, 50) and not flat(1, 0) and none is None

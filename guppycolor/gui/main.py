@@ -1153,8 +1153,9 @@ def measures_legend():
              ('depth', 'maximum depth')]
     rows = [f'<span style="color:{hexc(k)}; font-weight:700">&#9644;</span> {t}' for k, t in items]
     rows.append(f'<span style="color:{LANDMARK_COLOUR}; font-weight:700">&#9679;&#9644;</span> from the landmarks, '
-                'and then they win over the outline: SL (snout to end of the peduncle), TL (dashed, snout to tail '
-                'tip), end of the body across the peduncle, maximum depth across the body at the gonopodium base')
+                'and then they win over the outline: SL (snout to end of the peduncle, along the fish), TL = SL + the '
+                'tail fin (dashed, to the tail tip), end of the body (the arc through the caudal fin base points), '
+                'maximum depth across the body at the gonopodium base')
     rows.append(f'<span style="color:{COLOUR_START_COLOUR}; font-weight:700">&#8943;</span> colours start here '
                 '(the head before it is left out of the colours, e.g. 2 mm behind the eye)')
     return '<br>'.join(rows)
@@ -1185,18 +1186,21 @@ def measures_pixmap(project, r):
         pen = QPen(QColor(LANDMARK_COLOUR))
         pen.setWidthF(max(2.0, pm.width() / 200))
         qp.setPen(pen)
-        lines = [r.get('body_end_line'), r.get('depth_line')]
-        if pts.get('snout') and pts.get('peduncle_end'):
-            lines.append([pts['snout'], pts['peduncle_end']])
-        for line in filter(None, lines):
-            (ax, ay), (bx, by) = to(line[0]), to(line[1])
-            qp.drawLine(ax, ay, bx, by)
-        if pts.get('snout') and pts.get('tail_tip'):            # TL: dashed, next to the SL line
+        def poly(line):
+            for a, b in zip(line[:-1], line[1:]):
+                (ax, ay), (bx, by) = to(a), to(b)
+                qp.drawLine(ax, ay, bx, by)
+        sl = r.get('sl_path') or ([pts['snout'], pts['peduncle_end']] if pts.get('snout') and pts.get('peduncle_end')
+                                  else None)
+        for line in filter(None, [r.get('body_end_line'), r.get('depth_line'), sl]):
+            poly(line)
+        tail = r.get('tl_path') or ([pts['snout'], pts['tail_tip']] if pts.get('snout') and pts.get('tail_tip')
+                                    else None)
+        if tail:                                                 # TL = SL + this tail part: dashed
             dash = QPen(pen)
             dash.setStyle(Qt.DashLine)
             qp.setPen(dash)
-            (ax, ay), (bx, by) = to(pts['snout']), to(pts['tail_tip'])
-            qp.drawLine(ax, ay, bx, by)
+            poly(tail)
             qp.setPen(pen)
         if r.get('colour_start_line'):                           # colours start here (head left out)
             dot = QPen(QColor(COLOUR_START_COLOUR))

@@ -1,9 +1,12 @@
 """Sizes of one fish: from the outline first, then the landmarks win where they exist.
 
-- SL: snout -> end of the caudal peduncle (landmarks only).
-- TL: snout -> tail tip landmark; without it, the outline length when the whole tail fin is in the outline.
-- End of the body: the line across the fish at the peduncle landmark (perpendicular to snout -> peduncle); the body
-  area is the outline before it, the caudal fin area the outline after it (only when the fin is in the outline).
+- SL: snout -> end of the caudal peduncle landmark, along the midline of the outline (it follows a bent fish).
+- TL: SL + the tail fin, end of the peduncle -> tail tip landmark along the midline; without the tail tip, the
+  outline length when the whole tail fin is in the outline.
+- End of the body: the arc through the top of the caudal fin base, the end of the peduncle and the bottom of the
+  caudal fin base (the peduncle ends rounded, not flat); with only the peduncle landmark, the straight line across
+  the fish there. The body area is the outline before it, the caudal fin area the outline after it (only when the
+  fin is in the outline).
 - Maximum depth: across the body at the base of the gonopodium (or another depth landmark of the profile), else the
   widest point of the outline.
 The outline values are kept in r['outline'] so that adding or removing a landmark can be undone without a new
@@ -12,6 +15,7 @@ import numpy as np
 
 DEPTH_LANDMARKS = ('gonopodium_base', 'anal_fin_base', 'depth_point')    # first one present is used
 FIN_REACH = 0.85     # the fin is in the outline if the outline reaches this share of peduncle -> tail tip
+CAUDAL_TOP, CAUDAL_BOTTOM = 'caudal_base_top', 'caudal_base_bottom'
 
 
 def _unit(v):
@@ -30,6 +34,68 @@ def body_axis(r, pts):
                     return u
     ax = (r.get('outline') or {}).get('axis')
     return _unit(ax) if ax else None
+
+
+def _arc_position(m, cum, p):
+    """Arc length along the polyline m (cumulative lengths cum) of the point of m nearest to p, and that point."""
+    a, b = m[:-1], m[1:]
+    d = b - a
+    t = np.clip(((p - a) * d).sum(1) / np.maximum((d * d).sum(1), 1e-12), 0, 1)
+    near = a + t[:, None] * d
+    k = int(np.argmin(np.hypot(*(near - p).T)))
+    return cum[k] + t[k] * np.hypot(*d[k]), near[k]
+
+
+def along(midline, a, b):
+    """Path a -> b that follows the shape of the midline (points ordered snout -> tail) between the places nearest
+    to a and to b, shifted so that it starts at a and ends at b (a landmark a little off the midline does not add
+    a detour). Straight when there is no midline or b is not after a on it."""
+    a, b = np.asarray(a, float), np.asarray(b, float)
+    if midline is None or len(midline) < 2:
+        return [a.tolist(), b.tolist()]
+    m = np.asarray(midline, float)
+    cum = np.r_[0, np.cumsum(np.hypot(*np.diff(m, axis=0).T))]
+    (ta, pa), (tb, pb) = _arc_position(m, cum, a), _arc_position(m, cum, b)
+    if tb <= ta:
+        return [a.tolist(), b.tolist()]
+    sel = (cum > ta) & (cum < tb)
+    f = ((cum[sel] - ta) / (tb - ta))[:, None]
+    inner = m[sel] + (1 - f) * (a - pa) + f * (b - pb)
+    return [a.tolist()] + inner.tolist() + [b.tolist()]
+
+
+def path_length(path):
+    return float(np.hypot(*np.diff(np.asarray(path, float), axis=0).T).sum())
+
+
+def body_end(ped, u, top=None, bottom=None):
+    """The end of the body as a function: (s, v) -> True on the snout side, with s along u and v across, both from
+    the peduncle landmark. The arc through top, peduncle and bottom when both are there (a circle, or the straight
+    line through top and bottom when the three are in line); else the straight line across the fish at the
+    peduncle. Also returns the end of the body as a polyline in photo pixels (for the pictures)."""
+    ped, u = np.asarray(ped, float), np.asarray(u, float)
+    n = np.array([-u[1], u[0]])
+    local = lambda p: (float((np.asarray(p, float) - ped) @ u), float((np.asarray(p, float) - ped) @ n))
+    if top is None or bottom is None:
+        return (lambda s, v: s <= 0), None
+    (s1, v1), (s2, v2) = local(top), local(bottom)
+    if abs(v1 - v2) < 1:
+        return (lambda s, v: s <= 0), None
+    lo, hi = min(v1, v2), max(v1, v2)
+    # circle through (v1, s1), (0, 0), (v2, s2) in the (v, s) plane: v^2 + s^2 + D v + E s = 0
+    A = np.array([[v1, s1], [v2, s2]])
+    rhs = -np.array([v1 ** 2 + s1 ** 2, v2 ** 2 + s2 ** 2])
+    if abs(np.linalg.det(A)) < 1e-6 * max(1.0, (v1 ** 2 + s1 ** 2) * (v2 ** 2 + s2 ** 2)) ** 0.5:
+        cut = lambda v: s1 + (np.clip(v, lo, hi) - v1) * (s2 - s1) / (v2 - v1)
+    else:
+        D, E = np.linalg.solve(A, rhs)
+        vc, sc = -D / 2, -E / 2
+        R = np.hypot(vc, sc)
+        sign = 1.0 if sc < 0 else -1.0                   # the branch that passes through the peduncle (0, 0)
+        cut = lambda v: sc + sign * np.sqrt(np.maximum(R ** 2 - (np.clip(v, lo, hi) - vc) ** 2, 0))
+    vs = np.linspace(lo, hi, 15)
+    line = [(ped + float(cut(v)) * u + v * n).round(1).tolist() for v in vs]
+    return (lambda s, v: s <= cut(v)), line
 
 
 def colour_start(r, pts, prof, ppm):
@@ -85,7 +151,7 @@ def update(r, mask, pts, flags):
     pts = pts or {}
     flags = [f for f in flags if f and f not in ('tail_incomplete', 'sl_landmarks_missing')]
     for k in ('standard_length_px', 'total_length_px', 'total_length_source', 'caudal_area_px', 'caudal_length_px',
-              'body_end_line', 'depth_line', 'depth_source', 'body_area_source'):
+              'body_end_line', 'depth_line', 'depth_source', 'body_area_source', 'sl_path', 'tl_path'):
         r.pop(k, None)
     if 'body_area_px' in o:
         r['body_area_px'], r['body_area_source'] = o['body_area_px'], 'outline'
@@ -101,19 +167,24 @@ def update(r, mask, pts, flags):
         ref = np.asarray(snout if snout else (xs.mean(), ys.mean()), float)
         proj = (np.c_[xs, ys] - ref) @ u
         if snout and ped:
-            sl = float(np.hypot(*np.subtract(ped, snout)))
-            r['standard_length_px'] = round(sl, 1)
-            cut = float(np.subtract(ped, ref) @ u)
-            body = proj <= cut
-            r['body_area_px'], r['body_area_source'] = int(body.sum()), 'landmarks'
+            path = along(o.get('midline'), snout, ped)
+            r['standard_length_px'] = round(path_length(path), 1)
+            r['sl_path'] = np.round(path, 1).tolist()
             n = np.array([-u[1], u[0]])
-            half = 0.5 * float(o.get('max_depth_px') or 0.2 * sl)
-            r['body_end_line'] = [(np.asarray(ped) - half * n).tolist(), (np.asarray(ped) + half * n).tolist()]
+            d = np.c_[xs, ys] - np.asarray(ped, float)
+            ahead, arc = body_end(ped, u, pts.get(CAUDAL_TOP), pts.get(CAUDAL_BOTTOM))
+            body = ahead(d @ u, d @ n)
+            r['body_area_px'], r['body_area_source'] = int(body.sum()), 'landmarks'
+            half = 0.5 * float(o.get('max_depth_px') or 0.2 * r['standard_length_px'])
+            r['body_end_line'] = arc or [(np.asarray(ped) - half * n).tolist(), (np.asarray(ped) + half * n).tolist()]
             if tip:
+                cut = float(np.subtract(ped, ref) @ u)
                 tip_cut = float(np.subtract(tip, ref) @ u)
                 reach = proj.max()
                 fin_in_outline = tip_cut > cut and reach >= cut + FIN_REACH * (tip_cut - cut)
-                r['caudal_length_px'] = round(float(np.hypot(*np.subtract(tip, ped))), 1)
+                tail = along(o.get('midline'), ped, tip)
+                r['caudal_length_px'] = round(path_length(tail), 1)
+                r['tl_path'] = np.round(tail, 1).tolist()
             if fin_in_outline:
                 r['caudal_area_px'] = int((~body).sum())
         depth_at = next((pts[k] for k in DEPTH_LANDMARKS if k in pts), None)
@@ -127,7 +198,11 @@ def update(r, mask, pts, flags):
     elif snout and ped:
         r['standard_length_px'] = round(float(np.hypot(*np.subtract(ped, snout))), 1)
     if snout and tip:
-        r['total_length_px'], r['total_length_source'] = round(float(np.hypot(*np.subtract(tip, snout))), 1), 'landmarks'
+        if r.get('standard_length_px') and r.get('caudal_length_px'):           # TL = SL + the tail fin
+            tl = r['standard_length_px'] + r['caudal_length_px']
+        else:
+            tl = path_length(along(o.get('midline'), snout, tip))
+        r['total_length_px'], r['total_length_source'] = round(tl, 1), 'landmarks'
     elif fin_in_outline and o.get('mask_length_px'):
         r['total_length_px'], r['total_length_source'] = o['mask_length_px'], 'outline'
     r['caudal_in_mask'] = bool(fin_in_outline)

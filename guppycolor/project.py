@@ -42,6 +42,8 @@ DEFAULT_SETTINGS = {
     'checks': {'session_pct': 10},       # imported outline model (outline_vN); '' = zero-training detector (YOLOE + SAM)
 }
 
+# How the measures are made: raised when a new version measures differently, so every photo is analysed again.
+MEASURES_VERSION = 2        # 2 (0.13): SL/TL along the midline, colours start behind the eye
 # Settings that change the numbers: a change makes earlier results stale.
 ANALYSIS_KEYS = ('colour', 'scale', 'head', 'parts', 'profile', 'labels', 'colours', 'analysis', 'landmarks')
 
@@ -129,6 +131,7 @@ class Project:
 
     def settings_hash(self):
         s = {k: self.settings[k] for k in ANALYSIS_KEYS}
+        s['measures'] = MEASURES_VERSION
         if self.settings['outline'].get('model'):      # only then, so projects made before it stay current
             s['outline'] = self.settings['outline']
         if self.settings.get('colours_off'):

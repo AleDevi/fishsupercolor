@@ -487,7 +487,8 @@ def analyse(project, folder, photo, segmenter=None, reference=None, expected_ids
         r['outline'] = {'body_area_px': morph['body_area_px'], 'max_depth_px': round(morph['max_depth_px'], 1),
                         'mask_length_px': r['mask_length_px'], 'fin_found': morph['fin_found'],
                         'axis': [round(float(v), 4) for v in morph['axis']],
-                        'snout': [round(float(v), 1) for v in morph['snout']]}
+                        'snout': [round(float(v), 1) for v in morph['snout']],
+                        'midline': np.round(np.asarray(morph['line'])[::5], 1).tolist()}
         flags += find_landmarks(project, photo, img, mask, r)
         flags = sizes.update(r, mask, r.get('landmarks'), flags)     # landmarks win over the outline
         flags += mask_flags(mask, morph)

@@ -176,12 +176,14 @@ def train(project, epochs=150, imgsz=640, progress=None, start_from=None):
     untrained = set()
     if start_from:
         _, _, base_meta = load_model(project, start_from)      # checks its SHA-256 too
-        if base_meta.get('keys') != keys:
+        theirs = base_meta.get('keys') or []
+        if not theirs or not set(theirs) <= set(keys):
             raise ValueError(f'{start_from} has other landmarks than this project')
         base = model_weights(project, start_from)
         imgsz = int(base_meta.get('imgsz', imgsz))
         epochs = min(epochs, 60)
-        untrained = set(base_meta.get('not_trained') or [])
+        # landmarks it never saw (e.g. ones added to the profile later) are learnt from the clicks only
+        untrained = set(base_meta.get('not_trained') or []) | (set(keys) - set(theirs))
     else:
         base = segment.ensure_file(BASE, BASE_SHA256)
         untrained = set(keys)
