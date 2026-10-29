@@ -293,6 +293,13 @@ def test_session_check_flags_a_scale_far_from_the_others(tmp_path):
     p.settings['checks']['session_pct'] = 30
     rs = {r['file']: r for r in pipeline.session_checks(p)}
     assert rs['3.jpg']['status'] == 'ok' and not rs['3.jpg']['flags']
+    # a scale drawn by hand on the odd photo: no scale flag any more, and the fish length is right again
+    p.settings['checks']['session_pct'] = 10
+    from guppycolor import scaleline
+    scaleline.save(p, str(folder / '3.jpg'), (0, 0), (400, 0), 20)
+    rs = {r['file']: r for r in pipeline.session_checks(p)}
+    assert rs['3.jpg']['scale_source'] == 'line' and not rs['3.jpg']['flags'] and rs['3.jpg']['status'] == 'ok'
+    assert scaleline.photo_line(p, str(folder / '3.jpg')) == ([0.0, 0.0], [400.0, 0.0], 20.0)
 
 
 def test_landmark_outside_the_outline_grows_it():

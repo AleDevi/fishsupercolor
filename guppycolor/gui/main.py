@@ -988,10 +988,23 @@ class ReviewPage(QWidget):
             pm = load_pixmap(r['path'])
             box = [0, 0, pm.width(), pm.height()]
             line = r.get('scale_line')
-            if line:
+            hand = scaleline.photo_line(self.win.project, r['path']) if r.get('scale_source') == 'line' else None
+            if hand:                                    # the line drawn by hand replaces the automatic one
+                lines, line = [hand[:2]], None
+            elif line and r.get('scale_source') != 'line_folder':
                 lines = [line]
+            else:
+                line = None
             self.b_confirm.setVisible(bool(line))
-            if r.get('px_per_mm'):
+            if hand:
+                self.scale_text.setText(f"Scale set by hand: {r['px_per_mm']:.2f} px/mm (the red line is the "
+                                        f"{hand[2]:g} mm you drew). Lengths in mm are already updated: no new "
+                                        "analysis needed.")
+            elif r.get('scale_source') == 'line_folder':
+                self.scale_text.setText(f"Scale set by hand for the whole folder: {r['px_per_mm']:.2f} px/mm (line "
+                                        "drawn on another photo). Lengths in mm are already updated: no new "
+                                        "analysis needed.")
+            elif r.get('px_per_mm'):
                 self.scale_text.setText(f"Scale: {r['px_per_mm']:.2f} px/mm ({r.get('scale_source') or '?'}"
                                         + (f", {r['scale_squares']} squares" if r.get('scale_squares') else '') + ')'
                                         + ('. If the red line covers 2 cm, Confirm; otherwise Calibrate manually.'

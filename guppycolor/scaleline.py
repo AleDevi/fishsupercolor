@@ -35,6 +35,12 @@ def load_folders(project):
     return {str(k): float(v) for k, v in (_read(folders_path(project)) or {}).items()}
 
 
+def photo_line(project, photo):
+    """(p1, p2, mm) of the line drawn on this photo, or None."""
+    d = _read(path(project, photo))
+    return (d['p1'], d['p2'], float(d['mm'])) if d and d.get('p1') and d.get('p2') else None
+
+
 def photo_scale(project, photo):
     """px/mm from the line drawn on this photo, or None."""
     d = _read(path(project, photo))

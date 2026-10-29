@@ -32,6 +32,12 @@
   that share in the model (`class_share`, used by app 0.13.0 Ritocco) and teaches the landmark model the top and
   bottom of the caudal fin base. Use the latest kit.
 
+## 0.14.1 (2026-10-29)
+- Review > Scale: after **Calibrate manually** the view shows the line you drew (not the automatic 2 cm line any
+  more) and says that the lengths in mm are already updated: a scale set by hand never needs a new analysis.
+- A scale set by hand is no longer flagged `scale_off_session`. `size_off_session` stays while the fish length is
+  still far from its folder: check the fish, then **Accept the photo**.
+
 ## 0.14.0 (2026-10-29)
 - **The app uses an NVIDIA graphics card**: on a PC with one, `install_windows.bat` now installs the version of
   PyTorch that uses the card (CUDA 13.0, `requirements-win-cuda.txt`, the same hash-locked file as GuppyTraining). The

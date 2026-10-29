@@ -136,7 +136,10 @@ colour**. Only these move to the next photo.
   length (2 cm by default, the longer the more precise), type its length in mm, and tick *Use it also for the
   other photos of the folder* when the camera did not move. The scale drawn by hand stays for later analyses.
   The Scale view also opens when the scale or the fish length is far from the rest of the folder (Settings >
-  Scale > Check): check the line, or the fish.
+  Scale > Check): check the line, or the fish. A scale set by hand takes effect at once (lengths and areas in mm in
+  Results and the CSV, the folder check), with no new analysis; the Scale view then shows the line you drew. The
+  pictures of the Fish view are in pixels and do not change (only their 5 mm bar is redrawn at the next analysis).
+  A fish whose length is still far from its folder keeps its warning: check it, then **Accept the photo**.
 
 ### 5 Results
 Table of the main measures (SL, TL, mask length, depth, areas) and **Export CSV for R** (`export/measurements.csv`).

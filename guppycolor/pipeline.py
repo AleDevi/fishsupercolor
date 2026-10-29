@@ -574,7 +574,8 @@ def run(project, segmenter=None, progress=None, stop=None):
 def session_checks(project, results=None):
     """Flag the photos whose scale (px/mm) or fish length (SL, else outline length, in mm) is more than
     checks.session_pct % away from the median of their session (folder), so a wrong scale shows in Review. Needs 3
-    photos in the session. Updates and saves only the results that change; returns the results."""
+    photos in the session. A scale drawn by hand is not flagged again; the fish length still is, until the photo is
+    accepted. Updates and saves only the results that change; returns the results."""
     pct = float((project.settings.get('checks') or {}).get('session_pct') or 0) / 100
     results = project.results() if results is None else results
     by = {}
@@ -588,8 +589,8 @@ def session_checks(project, results=None):
         group = by.get(r.get('folder'), [])
         if pct > 0 and r in group and len(group) >= 3:
             ppm = statistics.median(o['px_per_mm'] for o in group)
-            if abs(r['px_per_mm'] / ppm - 1) > pct:
-                flags.append('scale_off_session')
+            if abs(r['px_per_mm'] / ppm - 1) > pct and r.get('scale_source') not in ('line', 'line_folder'):
+                flags.append('scale_off_session')       # a scale drawn by hand is the user's decision
             lens = [length(o) for o in group if length(o) > 0]
             if lens and length(r) > 0 and abs(length(r) / statistics.median(lens) - 1) > pct:
                 flags.append('size_off_session')
