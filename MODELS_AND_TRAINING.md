@@ -2,7 +2,7 @@
 
 One page for every model Guppy Colour uses: which ones exist, where they are saved, where to load them in the
 app, where to find the ones already trained, and how to train new ones on the app or with the **GuppyTraining**
-kit. Updated with every release (last update: app 0.12.0, GuppyTraining 0.2.1).
+kit. Updated with every release (last update: app 0.12.0, GuppyTraining 0.2.2).
 
 - [In short: what to use today](#in-short-what-to-use-today)
 - [The four kinds of model](#the-four-kinds-of-model)
@@ -74,7 +74,7 @@ the colour classes, landmarks or body parts of the model are those of the projec
 | --- | --- | --- | --- |
 | `landmarks_vanderbijl.zip` | about 1,570 van der Bijl 2025 photos (live males in a tank), GuppyTraining 0.1.1, 26 Oct 2026 | work PC: `Experiments\Padova\Guppy colouration automation\Risultati Training\results` | snout, eye, end of the caudal peduncle, tail tip; no dorsal fin base, no gonopodium base (click those yourself). On their test photos SL error about 1.5%; on our graph-paper photos the snout/eye/peduncle are good on about half: use it as the start for Ritocco |
 | `outline_vanderbijl.zip` | same photos | same folder | body and caudal fin; on their photos overlap 0.98; on ours it often misses the closed, transparent caudal fin |
-| `colours_vanderbijl.zip` | van der Bijl orange and black masks (GuppyTraining 0.2.1) | not made yet: run GuppyTraining 0.2.1 on the lab PC (below); it will land in the same `results` folder | orange, black and body without colour, no iridescent; their photos have no colour chart, so refine it on yours |
+| `colours_vanderbijl.zip` | van der Bijl orange and black masks (GuppyTraining 0.2.2) | lab PC `results` folder, then the work PC as above. Made with 0.2.2? Run 0.2.2 and import again: 0.2.2 overestimated orange and black by about 3 percentage points | orange, black and body without colour, no iridescent; their photos have no colour chart, so refine it on yours |
 | your colour and landmark models | your photos | `models\` of each project | export them to reuse them |
 
 The report of that training (`report.html`) and the test on our photos (`prova_foto_Ale.html`) are in the same
@@ -127,16 +127,16 @@ internet the first time (about 3 GB of packages), about 30 GB free.
    `carotenoid_coloration.zip`, `melanic_coloration_v2.zip`, `fixed_landmarks.zip` (leave the zips zipped) and
    the photos in `data\foto_2000\`. Optional: other photos in `data\other_photos\`, only drawn in the report.
 3. Double-click `install_training.bat`. At the end it must say "GPU OK".
-   **Updating the kit** (e.g. 0.1.1 to 0.2.1): unzip the new version into a new, empty folder (e.g.
-   `C:\GuppyTraining_0.2.1`), never over the old one. Move the folders `data\` (it holds `work\`, the finished
+   **Updating the kit** (e.g. 0.2.1 to 0.2.2): unzip the new version into a new, empty folder (e.g.
+   `C:\GuppyTraining_0.2.2`), never over the old one. Move the folders `data\` (it holds `work\`, the finished
    steps) and `results\` from the old kit folder into the new one, run `install_training.bat`, then
-   `start_training.bat`: the steps already finished are skipped. A step that was interrupted halfway starts again
+   `start_training.bat`: the steps already finished are skipped (from 0.2.1 to 0.2.2 only the colour model and the check run again, about 10 minutes). A step that was interrupted halfway starts again
    from its beginning. Then delete the old kit folder.
 4. Double-click `quick_test.bat` (a few minutes) to check the kit runs on this PC.
 5. Double-click `start_training.bat` and leave the PC on (about 1.5 h on the RTX 4070). If it stops, double-click
    it again: it resumes, and steps already finished are skipped.
 6. The results are in `results\`: `landmarks_vanderbijl.zip`, `outline_vanderbijl.zip`, `colours_vanderbijl.zip`
-   (from 0.2.1), `report.html` (with % orange and % black against van der Bijl's own percentages) and
+   (from 0.2.2), `report.html` (with % orange and % black against van der Bijl's own percentages) and
    `colour_test_results.csv`. Copy the
    folder to a USB stick, put it on the work PC in `Guppy colouration automation\Risultati Training\`, and import
    the zips as in [Loading a model](#loading-a-model-which-file-goes-where).
