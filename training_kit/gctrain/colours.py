@@ -25,6 +25,7 @@ KEYS = ('orange', 'black', 'base')
 PER_PHOTO = 300             # training pixels per class and photo
 PER_CLASS = 150000          # training pixels per class in all (class-balanced sample)
 TREES = 60
+METHOD = 2                  # 1: kit 0.2.0-0.2.1 (classes balanced); 2: weighted to their true share
 SOURCE = 'van der Bijl et al. 2025, Nature Ecology & Evolution; data FRDR doi 10.20383/103.01281 (CC BY 4.0)'
 
 
@@ -73,10 +74,12 @@ def train_pixels(job):
     uid, path = job
     a, rgb = _read(uid, path)
     if a is None:
-        return uid, None, None
+        return uid, None, None, None
+    lab = labels(a, _index)
+    counts = np.bincount(lab[lab > 0], minlength=256)
     X, y = pixels.training_pixels(rgb, a['fish'], labels(a, _index), per_class=PER_PHOTO, 
                                 seed=int(hashlib.sha256(uid.encode()).hexdigest()[:6], 16))
-    return uid, X, y
+    return uid, X, y, counts
 
 
 def test_photo(job):
@@ -134,9 +137,12 @@ def run(work, annotations, photos, log=print, profile_name='guppy_male', workers
     os.makedirs(out, exist_ok=True)
     summary_path = os.path.join(out, 'colour_summary.json')
     if os.path.exists(summary_path):
-        log('  colour model already trained')
         with open(summary_path, encoding='utf-8') as f:
-            return json.load(f)
+            done = json.load(f)
+        if done.get('method') == METHOD:
+            log('  colour model already trained')
+            return done
+        log('  colour model made by an earlier kit version: training it again')
     index = brush_index(profile_name)
     db = vdb.read_database(os.path.join(annotations, 'photo_database.csv'))
     found = prepare.find_photos(photos)
@@ -145,17 +151,20 @@ def run(work, annotations, photos, log=print, profile_name='guppy_male', workers
     jobs = {s: [(r['uid'], found[r['uid']]) for r in recs if r['split'] == s] for s in ('train', 'test')}
     workers = workers or max(1, min(8, (os.cpu_count() or 2) - 1))
     log(f'Colour model: reading the orange and black masks of {len(jobs["train"])} training photos')
-    X, y, used = [], [], []
+    X, y, used, counts = [], [], [], np.zeros(256, np.int64)
     with mp.get_context('spawn').Pool(workers, initializer=_init, initargs=(annotations, None, index)) as pool:
-        for i, (uid, xi, yi) in enumerate(pool.imap_unordered(train_pixels, jobs['train'], chunksize=4), 1):
+        for i, (uid, xi, yi, ci) in enumerate(pool.imap_unordered(train_pixels, jobs['train'], chunksize=4), 1):
             if xi is not None and len(yi):
-                X.append(xi); y.append(yi); used.append(uid)
+                X.append(xi); y.append(yi); used.append(uid); counts += ci
             if i % 200 == 0 or i == len(jobs['train']):
                 log(f'  {i} of {len(jobs["train"])} photos')
     X, y = np.concatenate(X), np.concatenate(y)
     keep = _sample(y, PER_CLASS)
     log(f'  growing the forest ({TREES} trees) on {len(keep)} pixels')
-    forest = pixels.Forest.train(X[keep], y[keep], trees=TREES)
+    # Forest.train balances the classes; weighting each pixel by its class's share of the fish brings back the true
+    # proportions (orange and black are a small part of a fish), so the model does not over-predict them
+    prior = counts / max(counts.sum(), 1)
+    forest = pixels.Forest.train(X[keep], y[keep], trees=TREES, sample_weight=prior[y[keep]].astype(np.float64))
     names = {b['key']: b for b in training.brushes(profile.load(profile_name))}
     pool_keep = keep[_sample(y[keep], training.POOL_PER_CLASS, seed=1)]
     forest.meta.update({
@@ -165,7 +174,8 @@ def run(work, annotations, photos, log=print, profile_name='guppy_male', workers
         'photos': sorted(used), 'pixels_per_class': {c: int((y == index[c]).sum()) for c in KEYS},
         'pool_pixels': int(len(pool_keep)), 'source': SOURCE, 'colour_correction': 'none (no chart in the photos)',
         'trained_with': {'trees': TREES, 'depth': 14, 'pixels_per_photo_and_class': PER_PHOTO,
-                         'pixels_per_class': PER_CLASS},
+                         'pixels_per_class': PER_CLASS,
+                         'class_weights': 'true share of the fish', 'method': METHOD},
     })
     model = os.path.join(out, 'colours_vanderbijl.npz')
     forest.save(model, pool={'pool_X': X[pool_keep].astype(np.float32), 'pool_y': y[pool_keep].astype(np.uint8),
@@ -192,7 +202,7 @@ def run(work, annotations, photos, log=print, profile_name='guppy_male', workers
                          (f'{r[c]:.4f}' if isinstance(r[c], float) else r[c]) for c in cols])
     col = lambda c: np.array([r[c] for r in rows], float)
     summary = {
-        'photos': len(rows), 'oob_accuracy': forest.meta.get('oob_accuracy'),
+        'method': METHOD, 'photos': len(rows), 'oob_accuracy': forest.meta.get('oob_accuracy'),
         'orange_vs_car_perc': _stats(col('pct_orange_model'), col('car_perc')),
         'black_vs_mel_perc': _stats(col('pct_black_model'), col('mel_perc')),
         'black_vs_mel_perc_v2': _stats(col('pct_black_model'), col('mel_perc_v2')),
