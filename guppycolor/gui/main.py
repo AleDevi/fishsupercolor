@@ -35,6 +35,8 @@ FLAG_LABEL = {
     'area_outlier': 'area very different from the other fish of the session',
     'label_uncertain': 'label read with low confidence: check the id',
     'colours_uncertain': 'the colour model is unsure on this fish: a good photo to paint in Training',
+    'colour_start_from_snout': 'no eye landmark: the colours start at a fixed distance from the snout (click the eye in Landmarks)',
+    'colour_start_missing': 'no eye or snout, or no scale: the head is not left out of the colours',
     'tail_incomplete': 'caudal fin not all in the outline: add it (Fish view), or mark the tail tip on screen 8 for TL',
     'date_mismatch': 'the date on the label differs from the date the photo was taken',
     'overexposed': 'more than 1% of the fish is burnt out (white)',
@@ -1081,10 +1083,13 @@ def measures_legend():
     rows.append(f'<span style="color:{LANDMARK_COLOUR}; font-weight:700">&#9679;&#9644;</span> from the landmarks, '
                 'and then they win over the outline: SL (snout to end of the peduncle), TL (dashed, snout to tail '
                 'tip), end of the body across the peduncle, maximum depth across the body at the gonopodium base')
+    rows.append(f'<span style="color:{COLOUR_START_COLOUR}; font-weight:700">&#8943;</span> colours start here '
+                '(the head before it is left out of the colours, e.g. 2 mm behind the eye)')
     return '<br>'.join(rows)
 
 
 LANDMARK_COLOUR = '#2979FF'
+COLOUR_START_COLOUR = '#FFD600'
 
 
 def measures_pixmap(project, r):
@@ -1094,7 +1099,7 @@ def measures_pixmap(project, r):
         return None
     pm = load_pixmap(img)
     pts = r.get('landmarks') or {}
-    if pts and not pm.isNull():
+    if (pts or r.get('colour_start_line')) and not pm.isNull():
         x0, y0, x1, _ = r['check_box']
         s = pm.width() / max(x1 - x0, 1)
         to = (lambda p: (int((p[0] - x0) * s), int((p[1] - y0) * s)))
@@ -1114,6 +1119,14 @@ def measures_pixmap(project, r):
             dash.setStyle(Qt.DashLine)
             qp.setPen(dash)
             (ax, ay), (bx, by) = to(pts['snout']), to(pts['tail_tip'])
+            qp.drawLine(ax, ay, bx, by)
+            qp.setPen(pen)
+        if r.get('colour_start_line'):                           # colours start here (head left out)
+            dot = QPen(QColor(COLOUR_START_COLOUR))
+            dot.setWidthF(pen.widthF())
+            dot.setStyle(Qt.DotLine)
+            qp.setPen(dot)
+            (ax, ay), (bx, by) = map(to, r['colour_start_line'])
             qp.drawLine(ax, ay, bx, by)
             qp.setPen(pen)
         qp.setBrush(QColor(LANDMARK_COLOUR))

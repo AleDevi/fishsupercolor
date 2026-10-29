@@ -268,15 +268,18 @@ def load_model(project, name):
     return _cache[key]
 
 
-def measure_colours(corrected, mask, forest, px_per_mm=None, merge_mm=0.0, min_spot_mm2=0.0, off=()):
+def measure_colours(corrected, mask, forest, px_per_mm=None, merge_mm=0.0, min_spot_mm2=0.0, off=(), head=None):
     """Areas (px of the original photo) per class and the single spots; also the label map for the check image.
-    Classes in `off` (not measured) count as body without colour."""
+    Classes in `off` (not measured) and the pixels of `head` (bool, photo size: before the colour start) count as body
+    without colour, so they stay in the fish area."""
     lab, box, s, conf = pixels.classify(corrected, mask, forest)
     classes = [c for c in forest.meta.get('classes', []) if c['key'] not in off]
     base = next((c['index'] for c in classes if c['key'] == 'base'), None)
     for c in forest.meta.get('classes', []):
         if c['key'] in off and base is not None:
             lab[lab == c['index']] = base
+    if head is not None and base is not None:
+        lab[(pixels.shrink(head.astype(np.uint8), box, s) > 0) & (lab > 0)] = base
     to_full = 1 / s ** 2
     merge_px = int(round(merge_mm * px_per_mm * s)) if px_per_mm and merge_mm else 0
     min_px = max(1, int(min_spot_mm2 * px_per_mm ** 2 * s ** 2)) if px_per_mm and min_spot_mm2 else 1

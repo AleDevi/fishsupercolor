@@ -32,6 +32,31 @@ def body_axis(r, pts):
     return _unit(ax) if ax else None
 
 
+def colour_start(r, pts, prof, ppm):
+    """Where the colours start (the head is left out, so the eye never counts as black): a point and the body axis,
+    with the line across the fish through the point as the cut. From the profile's colour_start (e.g. 2 mm behind the
+    eye landmark); without that landmark, a fixed distance from the snout. Returns (point, axis, source) or None
+    (source: the landmark used, or 'snout'); None also when the profile has no colour_start."""
+    cs = prof.get('colour_start')
+    pts = pts or {}
+    u = body_axis(r, pts)
+    if not cs or u is None or not ppm:
+        return None
+    lm = cs.get('landmark')
+    if lm in pts:
+        return (np.asarray(pts[lm], float) + float(cs.get('offset_mm', 0)) * ppm * u).tolist(), u.tolist(), lm
+    snout = pts.get(cs.get('fallback_landmark', 'snout')) or (r.get('outline') or {}).get('snout')
+    if snout is None or cs.get('fallback_mm') is None:
+        return None
+    return (np.asarray(snout, float) + float(cs['fallback_mm']) * ppm * u).tolist(), u.tolist(), 'snout'
+
+
+def ahead_of(shape, point, axis):
+    """Pixels in front of the line across the fish through point (on the snout side)."""
+    ys, xs = np.mgrid[:shape[0], :shape[1]]
+    return (xs - point[0]) * axis[0] + (ys - point[1]) * axis[1] < 0
+
+
 def chord(mask, p, d, reach):
     """Ends of the outline crossing the line through p with direction d: the run of fish pixels that contains p,
     or the nearest one (a landmark on the edge can fall just outside the outline). None if no run is close."""

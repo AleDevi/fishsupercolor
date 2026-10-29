@@ -44,6 +44,11 @@ def _shrink(a, box, s, interp):
     return cv2.resize(a, (max(1, round(a.shape[1] * s)), max(1, round(a.shape[0] * s))), interpolation=interp)
 
 
+def shrink(a, box, s):
+    """A photo-size label or mask array cut and scaled as the fish crop that classify() works on."""
+    return _shrink(a, box, s, cv2.INTER_NEAREST)
+
+
 def training_pixels(rgb, mask, strokes, per_class=4000, seed=0):
     """Features and labels of stroked pixels (strokes: uint8, 0 = none, k = class k)."""
     box, s = work_crop(mask)

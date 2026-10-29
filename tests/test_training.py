@@ -241,3 +241,30 @@ def test_import_colour_model_with_some_of_the_classes(tmp_path):
         modelshare.fit_colour_classes(arrays, bad, pool, mine)
     with pytest.raises(ValueError, match='training pixels'):
         modelshare.fit_colour_classes(arrays, f.meta, dict(pool, pool_X=X[:, :5]), mine)
+
+
+def test_colours_start_behind_the_eye(spotted):
+    from guppycolor import landmarks, profile, sizes
+    p = spotted
+    paint_first(p)
+    name, _ = training.train(p)
+    p.settings['colours']['model'] = name
+    p.save()
+    pipeline.run(p, segmenter=filled_segmenter)
+    photo = sorted(x for _, x in p.photos())[0]
+    r = p.load_result(photo)
+    assert r['colour_start_source'] == 'snout' and 'colour_start_from_snout' in r['flags']
+    whole = r['colours']['orange']['area_px']
+    fish = sum(v['area_px'] for k, v in r['colours'].items() if k != 'reflection')
+    # eye 2 mm before the centre of the orange spot (x = 800): the cut goes through it, half the spot is head
+    landmarks.save(p, photo, {'snout': [645.0, 650.0], 'eye': [800.0 - 2 * PX_PER_MM, 645.0],
+                              'peduncle_end': [1130.0, 650.0]})
+    r = p.load_result(photo)
+    assert r['colour_start_source'] == 'eye' and 'colour_start_from_snout' not in r['flags']
+    assert 0.3 < r['colours']['orange']['area_px'] / whole < 0.7
+    assert abs(sum(v['area_px'] for k, v in r['colours'].items() if k != 'reflection') - fish) / fish < 0.02
+    assert r['colour_start_line'][0][0] == pytest.approx(800, abs=2)
+    # a profile without colour_start: nothing is cut
+    prof = dict(profile.load('guppy_male'))
+    prof.pop('colour_start')
+    assert sizes.colour_start(r, r['landmarks'], prof, PX_PER_MM) is None

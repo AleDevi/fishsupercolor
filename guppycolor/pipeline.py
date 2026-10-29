@@ -342,14 +342,35 @@ def save_manual_mask(project, photo, mask):
     cv2.imwrite(manual_mask_path(project, photo), mask.astype(np.uint8) * 255)
 
 
+COLOUR_FLAGS = ('colours_uncertain', 'colour_start_from_snout', 'colour_start_missing')
+
+
 def measure_colours(project, r, corrected, mask):
-    """Colour classes with the project's trained model; areas stay in px (mm at export)."""
+    """Colour classes with the project's trained model; areas stay in px (mm at export). The head before the
+    profile's colour start (e.g. 2 mm behind the eye) counts as fish without colour."""
     from . import training
     cs = project.settings['colours']
+    prof = profile.load(project.settings['profile'])
     forest = training.load_model(project, cs['model'])
+    flags = []
+    start = sizes.colour_start(r, r.get('landmarks'), prof, r.get('px_per_mm'))
+    head = None
+    r.pop('colour_start_line', None)
+    if start:
+        point, u, src = start
+        head = sizes.ahead_of(mask.shape, point, u)
+        n = (-u[1], u[0])
+        half = 0.5 * float(r.get('max_depth_px') or 100)
+        r['colour_start_line'] = [[round(point[0] - half * n[0], 1), round(point[1] - half * n[1], 1)],
+                                  [round(point[0] + half * n[0], 1), round(point[1] + half * n[1], 1)]]
+        if src == 'snout':
+            flags.append('colour_start_from_snout')
+    elif prof.get('colour_start'):
+        flags.append('colour_start_missing')
+    r['colour_start_source'] = start[2] if start else None
     colori, labmap, conf = training.measure_colours(corrected, mask, forest, r.get('px_per_mm') if r.get('scale_ok') else None,
                                                    cs.get('merge_mm', 0), cs.get('min_spot_mm2', 0),
-                                                   training.classes_off(project))
+                                                   training.classes_off(project), head=head)
     r.update(colours=colori, colour_model=cs['model'], colour_confidence=round(conf, 3))
     try:                            # class map kept for the pattern screen, if installed
         from . import pattern
@@ -357,7 +378,7 @@ def measure_colours(project, r, corrected, mask):
     except ImportError:
         pass
     training.colour_overlay(os.path.join(project.dir('check'), r['photo_id'] + '_colours.jpg'), corrected, labmap, forest)
-    return ['colours_uncertain'] if conf < 0.6 else []
+    return flags + (['colours_uncertain'] if conf < 0.6 else [])
 
 
 def outline_problems(mask):
@@ -462,7 +483,8 @@ def analyse(project, folder, photo, segmenter=None, reference=None, expected_ids
                     cv2.imwrite(os.path.join(project.dir('masks'), f'{pid}_{k}.png'), m.astype(np.uint8) * 255)
         r['outline'] = {'body_area_px': morph['body_area_px'], 'max_depth_px': round(morph['max_depth_px'], 1),
                         'mask_length_px': r['mask_length_px'], 'fin_found': morph['fin_found'],
-                        'axis': [round(float(v), 4) for v in morph['axis']]}
+                        'axis': [round(float(v), 4) for v in morph['axis']],
+                        'snout': [round(float(v), 1) for v in morph['snout']]}
         flags += find_landmarks(project, photo, img, mask, r)
         flags = sizes.update(r, mask, r.get('landmarks'), flags)     # landmarks win over the outline
         flags += mask_flags(mask, morph)

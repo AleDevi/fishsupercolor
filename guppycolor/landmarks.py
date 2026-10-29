@@ -68,7 +68,12 @@ def update_result(project, photo, points):
     if 'outline' not in r:          # analysed before 0.10: what the outline gave is what is in the result
         r['outline'] = {k: r[k] for k in ('body_area_px', 'max_depth_px', 'mask_length_px') if k in r}
         r['outline']['fin_found'] = bool(r.get('caudal_in_mask'))
-    flags = sizes.update(r, training.fish_mask(project, photo), points, (r.get('flags') or '').split(';'))
+    mask = training.fish_mask(project, photo)
+    flags = sizes.update(r, mask, points, (r.get('flags') or '').split(';'))
+    if r.get('colours') and project.settings['colours'].get('model') and mask is not None:
+        from . import pipeline                  # the colours start behind the eye: measure them again
+        flags = [f for f in flags if f not in pipeline.COLOUR_FLAGS]
+        flags += pipeline.measure_colours(project, r, training.corrected_image(project, photo), mask)
     r['flags'] = ';'.join(flags)
     project.save_result(photo, r)
 
