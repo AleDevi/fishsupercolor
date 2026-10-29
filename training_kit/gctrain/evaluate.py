@@ -14,6 +14,8 @@ import numpy as np
 
 from guppycolor import landmarks as app_landmarks
 
+from . import vdb
+
 SL_FROM, SL_TO = app_landmarks.SL_FROM, app_landmarks.SL_TO
 
 
@@ -105,7 +107,7 @@ def run(work, extra_folders=(), log=print):
         pts = {k: [v[0] / s, v[1] / s] for k, v in pts_small.items()}
         sl_true = _length(tp, SL_FROM, SL_TO)
         row = {'uid': uid, 'manual_landmarks': uid in manual, **{f'iou_{k}': _iou(pred[k], truth[k]) for k in ('fish', 'body', 'caudal')}}
-        for k in ('snout', 'eye', 'peduncle_end', 'tail_tip'):
+        for k in vdb.TRAINED:
             row[f'err_{k}_pct_sl'] = (100 * _length({'a': pts.get(k), 'b': tp.get(k)}, 'a', 'b') / sl_true
                                       if k in tp and k in pts else float('nan'))
         row['sl_err_pct'] = 100 * (_length(pts, SL_FROM, SL_TO) - sl_true) / sl_true
@@ -173,7 +175,8 @@ def write_report(path, summary, rows, pics, extra, om, lm):
         tr.append(f'<tr><td>{label}</td><td>{_fmt(s.get("median"))}</td><td>{_fmt(s.get("p10"))} (worst 10%)</td>'
                   f'<td>{_fmt(hand.get(k, {}).get("median"))}</td></tr>')
     for k, label in (('err_snout_pct_sl', 'Snout'), ('err_eye_pct_sl', 'Eye'), ('err_peduncle_end_pct_sl', 'End of the peduncle'),
-                     ('err_tail_tip_pct_sl', 'Tail tip'), ('sl_err_pct', 'Standard length'), ('tl_err_pct', 'Total length')):
+                     ('err_tail_tip_pct_sl', 'Tail tip'),
+                     ('err_caudal_base_top_pct_sl', 'Caudal fin base, top'), ('err_caudal_base_bottom_pct_sl', 'Caudal fin base, bottom'), ('sl_err_pct', 'Standard length'), ('tl_err_pct', 'Total length')):
         s = summary.get(k, {})
         tr.append(f'<tr><td>{label}: error as % of SL</td><td>{_fmt(s.get("median_abs"), True)}</td>'
                   f'<td>{_fmt(s.get("p90_abs"), True)} (90% of fish below)</td>'

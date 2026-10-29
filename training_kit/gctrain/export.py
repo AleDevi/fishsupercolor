@@ -7,7 +7,7 @@ import json
 import os
 import zipfile
 
-from . import __version__
+from . import __version__, vdb
 
 
 def _sha(data):
@@ -41,7 +41,7 @@ def run(work, out, summary):
     files = [
         package(os.path.join(out, 'landmarks_vanderbijl.zip'), 'landmarks', 'landmarks_v1', lm['profile'], lm['weights'],
                 {'keys': lm['keys'], 'photos': n_train, 'imgsz': lm['imgsz'], 'gpu': lm['machine']['device'] != 'cpu',
-                 'not_trained': [k for k in lm['keys'] if k not in ('snout', 'eye', 'peduncle_end', 'tail_tip')],
+                 'not_trained': [k for k in lm['keys'] if k not in vdb.TRAINED],
                  'test': {k: v for k, v in summary.items() if k.startswith(('err_', 'sl_', 'tl_'))}}),
         package(os.path.join(out, 'outline_vanderbijl.zip'), 'outline', 'outline_v1', lm['profile'], om['weights'],
                 {'classes': ['body', 'caudal'], 'imgsz': om['imgsz'], 'photos': n_train,

@@ -95,6 +95,8 @@ def test_annotate_places_masks_and_points(tmp_path):
     assert a['body'].sum() + a['caudal'].sum() == a['fish'].sum()
     expected = vdb.transform([[2, 128]], M)[0]
     assert np.hypot(*(np.array(a['points']['snout']) - expected)) < 4
+    top, bottom = a['points']['caudal_base_top'], a['points']['caudal_base_bottom']
+    assert top[1] < bottom[1] and np.allclose(np.add(top, bottom) / 2, a['points']['peduncle_end'])
     assert 0.9 < a['orange'].sum() / (60 * 60 * 1.6 ** 2) < 1.1
 
 

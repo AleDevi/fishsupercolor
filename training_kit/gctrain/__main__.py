@@ -10,6 +10,7 @@ import os
 import shutil
 import sys
 
+from guppycolor import landmarks as app_landmarks, profile
 from guppycolor.engine import segment
 
 
@@ -41,6 +42,18 @@ def main(argv=None):
         log('The van der Bijl files were not found in ' + data + ' (nor in its subfolders): photo_database.csv, '
             + ', '.join(vdb.ZIPS.values()) + '. Copy them there, without unzipping them.'); return 1
     extra = a.extra or [d for d in (os.path.join(data, 'other_photos'),) if os.path.isdir(d)]
+    keys_json = os.path.join(work, 'landmarks', 'keys.json')
+    if os.path.exists(keys_json):                   # the profile's landmarks changed: landmark data and model again
+        with open(keys_json, encoding='utf-8') as f:
+            old = json.load(f)
+        new = [l['key'] for l in app_landmarks.landmark_list(profile.load(old.get('profile', 'guppy_male')))]
+        if old.get('keys') != new:
+            log('The landmarks of the profile changed: preparing the photos and training the landmark model again')
+            for d in ('landmarks', os.path.join('runs', 'landmarks')):
+                shutil.rmtree(os.path.join(work, d), ignore_errors=True)
+            for f in ('photos.csv', 'landmarks_model.json'):
+                if os.path.exists(os.path.join(work, f)):
+                    os.remove(os.path.join(work, f))
     if not os.path.exists(os.path.join(work, 'photos.csv')):
         log('Step 1 of 5: preparing the photos')
         prepare.run(ann, photos, work, log=log, limit=60 if a.quick else None)

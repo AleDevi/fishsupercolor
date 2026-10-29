@@ -7,7 +7,7 @@ Pre-trains three Guppy Colour models on the photos and annotations of **van der 
 | Model | What it learns | From which annotation | File in `results` |
 | --- | --- | --- | --- |
 | Outline (YOLO-seg) | the fish in the whole photo, as two parts: **body** and **caudal fin** (also its transparent part) | `extracted_fish` (body + whole caudal fin), split at the line between landmarks 3 and 4 (start of the caudal fin) | `outline_vanderbijl.zip` |
-| Landmarks (YOLO-pose) | **snout**, **eye**, **end of the caudal peduncle**, **tail tip**, so SL and TL | `fixed_landmarks` (1 eye, 2 snout, 3-4 start of the caudal fin: their midpoint is the end of the peduncle); tail tip = point of the outline farthest from the snout | `landmarks_vanderbijl.zip` |
+| Landmarks (YOLO-pose) | **snout**, **eye**, **end of the caudal peduncle**, **tail tip**, so SL and TL | `fixed_landmarks` (1 eye, 2 snout, 3-4 start of the caudal fin = `caudal_base_top`, `caudal_base_bottom`; their midpoint is the end of the peduncle); tail tip = point of the outline farthest from the snout | `landmarks_vanderbijl.zip` |
 | Colours (random forest, as in the Training screen) | **orange**, **black** and **body without colour** per pixel | `carotenoid_coloration` and `melanic_coloration_v2` inside `extracted_fish` (pixels in both masks left out; no colour correction: their photos have no chart) | `colours_vanderbijl.zip` |
 
 The dorsal fin and the gonopodium are not in the van der Bijl annotations: the landmark model has the

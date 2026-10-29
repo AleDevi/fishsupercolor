@@ -15,6 +15,7 @@ import numpy as np
 
 ZIPS = {'fish': 'extracted_fish.zip', 'orange': 'carotenoid_coloration.zip', 'black': 'melanic_coloration_v2.zip',
         'landmarks': 'fixed_landmarks.zip'}
+TRAINED = ('snout', 'eye', 'caudal_base_top', 'peduncle_end', 'caudal_base_bottom', 'tail_tip')   # landmarks they give
 MATCH_SCALE = 0.5            # the photo is matched at half size: fast, and the crop is still smaller than the fish
 MIN_INLIERS = 15
 MAX_DIFF = 30                # mean grey-level difference crop vs photo under the mask; above it the match is wrong
@@ -140,6 +141,8 @@ def annotate(ann, uid, photo):
     tail = tail_tip(caudal if caudal.any() else fish, snout, peduncle)
     out['points'] = {'snout': snout.tolist(), 'eye': eye.tolist(), 'peduncle_end': peduncle.tolist(),
                      'tail_tip': tail.tolist() if tail is not None else None}
+    top, bottom = sorted((fin_top, fin_bottom), key=lambda q: q[1])     # dorsal side up in their photos
+    out['points'].update(caudal_base_top=top.tolist(), caudal_base_bottom=bottom.tolist())
     return out, stats
 
 
