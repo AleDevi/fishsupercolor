@@ -119,7 +119,7 @@ for, how it is built, the rules every change must follow, and how to organise th
 - `guppy_male.json` (Poecilia reticulata, male)
   - parts: body, caudal, dorsal, gonopodium
   - colour classes: orange, black, iridescent
-  - landmarks, in clicking order: snout, eye (optional), dorsal_base, gonopodium_base (optional), peduncle_end, tail_tip (optional)
+  - landmarks, in clicking order: snout, eye (optional), dorsal_base, gonopodium_base (optional), caudal_base_top (optional), peduncle_end, caudal_base_bottom (optional), tail_tip (optional)
 
 #### Modules (first line of each docstring)
 
@@ -158,7 +158,7 @@ for, how it is built, the rules every change must follow, and how to organise th
 
 #### Tests
 
-- `test_app.py` (21), `test_gui.py` (5), `test_labels.py` (8), `test_landmarks.py` (17), `test_modelshare.py` (3), `test_outline.py` (5), `test_pattern.py` (8), `test_training.py` (12), `test_training_kit.py` (10).
+- `test_app.py` (21), `test_gui.py` (5), `test_labels.py` (8), `test_landmarks.py` (19), `test_modelshare.py` (3), `test_outline.py` (5), `test_pattern.py` (8), `test_training.py` (12), `test_training_kit.py` (10).
 
 <!-- AUTO:END -->
 
