@@ -82,17 +82,17 @@ for, how it is built, the rules every change must follow, and how to organise th
 
 ### Current state (generated)
 
-- Version: **0.12.0** (`guppycolor/__init__.py` and `pyproject.toml`).
+- Version: **0.13.0** (`guppycolor/__init__.py` and `pyproject.toml`).
 - Target Python: **3.12** on Windows (tests and installer). Pinned in `requirements.in`: `ultralytics==8.4.183`.
 - App screens (README, Workflow): 1 Project; 2 Settings; 3 Analysis; 4 Review; 5 Results; 6 Pattern and clusters; 7 Training (colour classes); 8 Landmarks.
 
 #### Recent versions (CHANGELOG)
 
 - **Unreleased**: New `training_kit/` (separate from the app, not in its release zip): standalone…
+- **0.13.0 (2026-10-29)**: SL and TL follow the fish: SL goes from the snout to the end of the caudal peduncle…; Rounded end of the peduncle: two new optional landmarks, *top* and *bottom of the caudal…; Colours start behind the head: 2 mm behind the eye landmark; Landmarks guide the outline: a landmark outside the outline (typically the tail tip on a…; Review: Accept / Exclude / size only / size + colour are now in a box *The whole photo…; Size check against the folder: Settings > Scale > *Check* (default 10 %) sends to Review…; Colour Ritocco keeps the true share of each class: the new model no longer paints more…; Settings > Fish ID: the formats are explained (`\d`, `{3}`, `/`) and Try the formats on…; Training says when Settings measures size only, with a button to measure colours again.
 - **0.12.0 (2026-10-27)**: Optional colour classes: the iridescent class is now optional (`"optional": true` in the…; Ritocco for colour models: Training > Start from: a colour model that keeps its training…; Import model (colours) accepts a model with only some of the project's classes (e.g.…; New guide `MODELS_AND_TRAINING.md`: which models exist, where they are saved, which file…
 - **0.11.0 (2026-10-26)**: Outline models: Settings > Fish outline can use an imported outline model instead of the…; Ritocco: Landmarks > Start from: training can start from a landmark model of the project…; Landmark models can say which landmarks they were never trained on (the training kit's…; Export / Import model works for outline models too.
 - **0.10.0 (2026-10-23)**: Landmarks win over the outline (new module `sizes.py`), as soon as they are clicked on…; Review shows each photo in separate views, Fish (outline and measures), Label (the label…; Add to the outline is now a click mode in the Fish view ("A click on the fish: redoes the…
-- **0.9.0 (2026-10-23)**: Results: the table now has `standard_length_mm` and `total_length_mm`; Fixed: on photos with the fish upright (head up or down) the "head on the left/right"…; Training and Landmarks screens: the crop around the fish leaves more room at the head and…
 
 #### Planned (CHANGELOG)
 

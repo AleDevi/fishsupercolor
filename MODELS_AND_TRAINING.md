@@ -2,7 +2,7 @@
 
 One page for every model Guppy Colour uses: which ones exist, where they are saved, where to load them in the
 app, where to find the ones already trained, and how to train new ones on the app or with the **GuppyTraining**
-kit. Updated with every release (last update: app 0.12.0, GuppyTraining 0.2.2).
+kit. Updated with every release (last update: app 0.13.0, GuppyTraining 0.3.0).
 
 - [In short: what to use today](#in-short-what-to-use-today)
 - [The four kinds of model](#the-four-kinds-of-model)
@@ -33,7 +33,7 @@ After changing a model, run **3 Analysis** again.
 | --- | --- | --- | --- |
 | Base models | find the fish (YOLOE), draw its outline (SAM 2.1), understand the word "fish" (MobileCLIP), read labels (OCR), starting point for landmark training (`yolo11n-pose.pt`) | public, downloaded once by the app and checked | nothing to choose: always there |
 | Colour model `colours_vN` | colour class of every pixel of the fish (orange, black, iridescent… as in the profile) | you, with brush strokes | 7 Training > *Use in the analysis* |
-| Landmark model `landmarks_vN` | places the profile's landmarks (snout, eye, end of the caudal peduncle, tail tip…) | you, with clicks; or GuppyTraining | 8 Landmarks > *Use in the analysis* |
+| Landmark model `landmarks_vN` | places the profile's landmarks (snout, eye, top and bottom of the caudal fin base, end of the caudal peduncle, tail tip…) | you, with clicks; or GuppyTraining | 8 Landmarks > *Use in the analysis* |
 | Outline model `outline_vN` | draws the fish as body + caudal fin, instead of the automatic detector | GuppyTraining (not trained in the app yet) | 2 Settings > *Fish outline* |
 
 `N` is a version number: every training or import adds the next one and nothing is overwritten.
@@ -66,15 +66,16 @@ it has to be imported on the screen of that kind:
 | `outline_*.zip`, e.g. `outline_vanderbijl.zip` | outline | 2 Settings > Fish outline > **Import outline model…** | it is put in use; *Automatic* in the same list switches back |
 
 A zip imported on the wrong screen is refused with a message saying which screen to use. Import also checks that
-the colour classes, landmarks or body parts of the model are those of the project's profile.
+the colour classes, landmarks or body parts of the model are among those of the project's profile (a model with
+fewer is fine: the missing ones are not predicted until you train them).
 
 ## Models already trained, and where to find them
 
 | Model | Trained on | Where | Notes |
 | --- | --- | --- | --- |
-| `landmarks_vanderbijl.zip` | about 1,570 van der Bijl 2025 photos (live males in a tank), GuppyTraining 0.1.1, 26 Oct 2026 | work PC: `Experiments\Padova\Guppy colouration automation\Risultati Training\results` | snout, eye, end of the caudal peduncle, tail tip; no dorsal fin base, no gonopodium base (click those yourself). On their test photos SL error about 1.5%; on our graph-paper photos the snout/eye/peduncle are good on about half: use it as the start for Ritocco |
+| `landmarks_vanderbijl.zip` | about 1,570 van der Bijl 2025 photos (live males in a tank), GuppyTraining 0.1.1, 26 Oct 2026 | work PC: `Experiments\Padova\Guppy colouration automation\Risultati Training\results` | snout, eye, end of the caudal peduncle, tail tip; from kit 0.3.0 also the top and bottom of the caudal fin base (their end of the peduncle is the middle of those two: refine it with your clicks); no dorsal fin base, no gonopodium base (click those yourself). On their test photos SL error about 1.5%; on our graph-paper photos the snout/eye/peduncle are good on about half: use it as the start for Ritocco |
 | `outline_vanderbijl.zip` | same photos | same folder | body and caudal fin; on their photos overlap 0.98; on ours it often misses the closed, transparent caudal fin |
-| `colours_vanderbijl.zip` | van der Bijl orange and black masks (GuppyTraining 0.2.2) | lab PC `results` folder, then the work PC as above. Made with 0.2.2? Run 0.2.2 and import again: 0.2.2 overestimated orange and black by about 3 percentage points | orange, black and body without colour, no iridescent; their photos have no colour chart, so refine it on yours |
+| `colours_vanderbijl.zip` | van der Bijl orange and black masks (GuppyTraining 0.3.0) | lab PC `results` folder, then the work PC as above. Made with 0.2.1? Run the latest kit and import again: 0.2.1 overestimated orange and black by about 3 percentage points | orange, black and body without colour, no iridescent; their photos have no colour chart, so refine it on yours |
 | your colour and landmark models | your photos | `models\` of each project | export them to reuse them |
 
 The report of that training (`report.html`) and the test on our photos (`prova_foto_Ale.html`) are in the same
@@ -97,17 +98,20 @@ everywhere: start it and let it run. Only GuppyTraining installs the version tha
 
 **Colour classes** (7 Training): paint strokes of each class on 5–10 fish, **Train**, look at *Show what the
 model sees*, add strokes where it is wrong, train again. **Start from** works as for landmarks (Ritocco): choose an
-imported colour model and your strokes count 3 times more than its pixels. Only models that keep their training
+imported colour model and your strokes count 3 times more than its pixels; each class keeps its true share of the fish, read from the start model (`class_share`, kit 0.3.0 and app 0.13.0 models), so the refined model does not over-predict orange or black. Only models that keep their training
 pixels can be a start: those trained or exported with app 0.12 or later. Optional classes (iridescent) have a
 brush only when they are switched on in Settings. Strokes and colours count only inside the fish outline, so fix
 the outline (tail included) in 4 Review first. Details in the README, section *7 Training*.
 
 **Landmarks** (8 Landmarks):
 
-1. Click the landmarks on 10–30 photos (clicks count at once for SL, without a new analysis).
+1. Click the landmarks on 10–30 photos (clicks count at once for SL, without a new analysis). Since app 0.13.0
+   the profile has two optional points around the end of the peduncle (top and bottom of the caudal fin base):
+   click them where you can, so the body ends on the right arc.
 2. **Start from**: `yolo11n-pose.pt` to start from scratch, or an imported landmark model to refine it
    (**Ritocco**: fewer rounds, gentle steps, so a few of your photos adapt it to your setup without undoing what
-   it learnt). Ritocco needs the model to have the same landmarks as the project's profile.
+   it learnt). The model may have fewer landmarks than the profile (e.g. an older one without the caudal fin base
+   points): the missing ones are learnt from your clicks.
 3. **Train**. The new model `landmarks_vN` is put in use. Run the Analysis again.
 4. Landmarks the model was never trained on are not predicted until you click them on some photos and train
    again.
@@ -127,10 +131,10 @@ internet the first time (about 3 GB of packages), about 30 GB free.
    `carotenoid_coloration.zip`, `melanic_coloration_v2.zip`, `fixed_landmarks.zip` (leave the zips zipped) and
    the photos in `data\foto_2000\`. Optional: other photos in `data\other_photos\`, only drawn in the report.
 3. Double-click `install_training.bat`. At the end it must say "GPU OK".
-   **Updating the kit** (e.g. 0.2.1 to 0.2.2): unzip the new version into a new, empty folder (e.g.
-   `C:\GuppyTraining_0.2.2`), never over the old one. Move the folders `data\` (it holds `work\`, the finished
+   **Updating the kit** (e.g. 0.2.2 to 0.3.0): unzip the new version into a new, empty folder (e.g.
+   `C:\GuppyTraining_0.3.0`), never over the old one. Move the folders `data\` (it holds `work\`, the finished
    steps) and `results\` from the old kit folder into the new one, run `install_training.bat`, then
-   `start_training.bat`: the steps already finished are skipped (from 0.2.1 to 0.2.2 only the colour model and the check run again, about 10 minutes). A step that was interrupted halfway starts again
+   `start_training.bat`: the steps already finished are skipped (from 0.2.x to 0.3.0 the preparation, the landmark model and the colour model run again, about 40 minutes; the outline model is kept). A step that was interrupted halfway starts again
    from its beginning. Then delete the old kit folder.
 4. Double-click `quick_test.bat` (a few minutes) to check the kit runs on this PC.
 5. Double-click `start_training.bat` and leave the PC on (about 1.5 h on the RTX 4070). If it stops, double-click

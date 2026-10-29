@@ -27,7 +27,41 @@
   (`report.html`) and writes model files in the app's export format. See `training_kit/README.md` and
   `MODELS_AND_TRAINING.md`. Kit 0.2.0 adds a colour model (orange, black, body without colour) from the van der
   Bijl masks, `colours_vanderbijl.zip`, to import in Training and refine with Ritocco; kit 0.2.1 reinstalls its
-  packages when the kit folder is new and finds its data after the folder is moved. Use 0.2.1, not 0.2.0.
+  packages when the kit folder is new and finds its data after the folder is moved. Kit 0.2.2 weights each colour
+  class by its true share of the fish (0.2.1 over-predicted orange and black by about 3 points); kit 0.3.0 records
+  that share in the model (`class_share`, used by app 0.13.0 Ritocco) and teaches the landmark model the top and
+  bottom of the caudal fin base. Use the latest kit.
+
+## 0.13.0 (2026-10-29)
+After installing, **run the Analysis again**: every photo is analysed once more because SL, TL and the colours are
+measured in a new way (outlines redone by hand, clicked landmarks, typed ids and Review decisions are kept).
+- **SL and TL follow the fish**: SL goes from the snout to the end of the caudal peduncle landmark along the midline
+  of the outline, so a bent fish is no longer measured short; TL = SL + the tail fin (end of the peduncle to the tail
+  tip, along the midline). Without the tail tip landmark TL is still the outline length when the fin is all in it.
+  `caudal_length_mm` is also along the midline.
+- **Rounded end of the peduncle**: two new optional landmarks, *top* and *bottom of the caudal fin base*
+  (`caudal_base_top`, `caudal_base_bottom`, clicked before and after the end of the peduncle). With them the body
+  ends on the arc through the three points, which gives `body_area_mm2` and `caudal_area_mm2`. SL still ends at
+  the peduncle landmark, not at the middle of the two new points. Landmark models without the new points still
+  work (the points are just not predicted); click them on some photos and train with Ritocco to learn them.
+- **Colours start behind the head**: 2 mm behind the eye landmark; the head counts as body without colour, so the
+  eye is never black and `pct_<class>` stays a share of the whole fish. Without an eye: 3.5 mm behind the snout,
+  flag `colour_start_from_snout`; without either: whole fish, flag `colour_start_missing`. Set in the profile
+  (`colour_start`); drawn as a yellow dotted line in Results. Moving a landmark re-measures the colours.
+- **Landmarks guide the outline**: a landmark outside the outline (typically the tail tip on a transparent caudal
+  fin) is used as a click to add the missing part, as *Add to the outline* does in Review. Flag
+  `outline_grown_to_landmarks`.
+- **Review**: Accept / Exclude / size only / size + colour are now in a box *The whole photo (all views)* and act
+  on the whole photo; the photo stays on screen after every fix (also after a scale) until you decide. The Label
+  view shows what was read (id, group, date, source, other readings, all the text) and the id box offers the other
+  readings to pick from.
+- **Size check against the folder**: Settings > Scale > *Check* (default 10 %) sends to Review the photos whose
+  px/mm or fish length is further than that from the median of their folder (flags `scale_off_session`,
+  `size_off_session`). It changes no number and needs no new analysis.
+- **Colour Ritocco keeps the true share of each class**: the new model no longer paints more orange or black than
+  there is (with the van der Bijl colour model, about 3 points too many). Models record the share in `class_share`.
+- Settings > Fish ID: the formats are explained (`\d`, `{3}`, `/`) and **Try the formats on** checks a text.
+- Training says when Settings measures size only, with a button to measure colours again.
 
 ## 0.12.0 (2026-10-27)
 - **Optional colour classes**: the iridescent class is now optional (`"optional": true` in the profile). Settings >

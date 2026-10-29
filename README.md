@@ -79,7 +79,9 @@ analysis at the next Start.
 - **Scale**: automatic from the graph paper (smallest square = 1 mm, measured over at least 20 squares = 2 cm),
   by hand (a known length drawn on the photo in Review), a fixed px/mm value (**Measure on a photo…** draws it on
   one photo), or none (pixels). A doubtful automatic scale goes to Review and, until it is confirmed, the CSV uses
-  the median of the session.
+  the median of the session. **Check** (default 10 %) sends to Review the photos whose scale or fish length is
+  further than that from the median of their folder (at least 3 photos; 0 switches it off; raise it when a folder
+  holds fish of very different sizes). It does not change the numbers.
 - **Body parts**: caudal, dorsal fin and gonopodium can be included or excluded. Recorded in the CSV; the
   separation itself comes with the body-part model.
 - **Head of the fish**: left (default), right, or guessed in each photo. Used for lengths and alignment.
@@ -88,6 +90,9 @@ analysis at the next Start.
   - *No id*.
   - *Label in the photo*: QR code first, else the written text (OCR), checked against the formats
     (`M\d{3}`, `G\d{1,2}`, `\d{1,2}/\d{2}`, editable) and, if given, against a list of valid ids (Excel/CSV).
+    How to read a format: a letter stands for itself (`M`), `\d` is any digit 0–9, `{3}` means exactly 3 of what
+    comes before it and `{1,2}` 1 or 2, `/` is the slash written on the label. So `M\d{3}` reads M001…M999 and
+    `\d{1,2}/\d{2}` reads dates such as 7/03 or 12/10. **Try the formats on** checks a text you type against them.
   - *File name*: the `{id}` part of the pattern.
   - *Data table + sequence*: a sheet with the fish id and the name of its photo (e.g. `SL_pictureID`).
     Photos not in the table take the id of the table photo before or after them in shooting order,
@@ -104,21 +109,27 @@ analysis at the next Start.
 found on each fish.
 
 ### 4 Review
-Photos with errors or warnings, most uncertain first. **Accept** (Enter) or **Exclude**. Each photo has three views;
-the ones with a warning sign have something to check, listed in red above the picture, and the screen opens on
-the most important one:
+Photos with errors or warnings, most uncertain first. Each photo has three views; the ones with a warning sign have
+something to check, listed in red above the picture, and the screen opens on the most important one. Fix what each
+view needs (the photo stays on screen after every fix), then decide on the whole photo in the box **The whole photo
+(all views)**: **Accept the photo** (Enter), **Exclude the photo**, **Measure size only** or **Measure size +
+colour**. Only these move to the next photo.
 
 - **Fish**: the outline with its measures drawn (legend in 5 Results). Choose what a click on the fish does:
   *redoes the whole outline* (fish not found, or wrong outline) or *adds the part you click to the outline*
   (transparent fins, often the caudal fin: click on the missing part, close to the fish; repeat for more parts).
   After a click the photo stays on screen with the new outline, and a message says how much the outline grew,
   whether the tail fin is now in it and what is left to check.
-- **Label**: the label close up (the whole photo when it was not found) with the text read; type the right id and
-  **Save id** (it wins over the reading from then on).
+- **Label**: the label close up (the whole photo when it was not found) and what was read: the fish id, group and
+  date found, where they came from (QR, OCR, file name, table), the other possible ids and all the text read. The
+  id box lists the other readings: pick one or type the right id, then **Save id** (it wins over the reading from
+  then on).
 - **Scale**: the whole photo. When the automatic scale is doubtful a red line should cover 2 cm (20 squares).
   **Confirm scale** if it does; otherwise **Calibrate manually**: zoom in (wheel), click the two ends of a known
   length (2 cm by default, the longer the more precise), type its length in mm, and tick *Use it also for the
   other photos of the folder* when the camera did not move. The scale drawn by hand stays for later analyses.
+  The Scale view also opens when the scale or the fish length is far from the rest of the folder (Settings >
+  Scale > Check): check the line, or the fish.
 
 ### 5 Results
 Table of the main measures (SL, TL, mask length, depth, areas) and **Export CSV for R** (`export/measurements.csv`).
@@ -162,7 +173,8 @@ Landmarks clicked in screen 8 (or placed by the landmark model) are used: the sn
    wheel zooms, right button drags. Strokes are saved as you paint.
 3. **Start from** (optional, *Ritocco*): a colour model that keeps its training pixels, e.g. one pre-trained on the
    van der Bijl 2025 orange and black masks and imported with **Import model…**. Your strokes count 3 times more
-   than its pixels, so a few strokes adapt it to your light and camera. *nothing: only my strokes* trains from your
+   than its pixels, so a few strokes adapt it to your light and camera. Each class keeps its true share of the fish
+   (from the start model, when it records it), so the new model does not paint more orange or black than there is. *nothing: only my strokes* trains from your
    strokes alone. **Train**. The model (`models/colours_vN`) is used in the analysis straight away and **Show what the
    model sees** paints its prediction over the photo. Add strokes where it is wrong and train again; each
    training makes a new version, and **Use in the analysis** picks one.
@@ -177,6 +189,15 @@ Landmarks clicked in screen 8 (or placed by the landmark model) are used: the sn
    fish, mean difference, mean absolute error, correlation and Bland-Altman limits of agreement, with a plot
    (`export/validation_<model>.png`) and the pairs (`.csv`). Spots cannot be matched one by one, so the
    comparison is on the totals.
+
+**Colours start behind the head.** Colours are measured from a line across the fish 2 mm behind the eye landmark
+(the eye is never black); the head in front of it counts as body without colour, so percentages are of the whole
+fish. Without an eye landmark the line is 3.5 mm behind the snout (flag `colour_start_from_snout`); without either,
+the whole fish is measured (flag `colour_start_missing`). The landmark and distances are in the profile
+(`colour_start`). The line is drawn in yellow, dotted, in 5 Results.
+
+**Size only.** When Settings says size only on every fish, the screen says so and **Measure colours on every fish**
+switches it back.
 
 **Where the models are.** In the project folder, `models\colours_v1.npz` + `colours_v1.json` (date, annotator,
 photos, pixels per class, `started_from`); every training adds v2, v3… A bar shows the training progress. Models
@@ -198,12 +219,14 @@ colour) and purple (reflection), then **Import strokes from Paint**.
 
 ### 8 Landmarks
 1. The list shows the analysed fish (photos with clicks first, marked ✓). The profile's landmarks are on the
-   right in order: for the guppy male *snout, eye, dorsal fin base, gonopodium base, end of the caudal
-   peduncle, tip of the tail*.
+   right in order: for the guppy male *snout, eye, dorsal fin base, gonopodium base, top of the caudal fin base,
+   end of the caudal peduncle, bottom of the caudal fin base, tip of the tail*. The top and bottom of the caudal fin
+   base are optional: with them the body ends on the arc through these three points (the peduncle ends rounded).
 2. Click each landmark on the fish; the highlighted one is next. **S** skips an optional landmark,
    **Backspace** undoes, **N** goes to the next photo. Mouse wheel zooms, right button drags. Clicks are saved
-   at once and the **standard length** (snout to end of the caudal peduncle) goes into the results straight
-   away: no new analysis needed.
+   at once and the **standard length** (snout to end of the caudal peduncle, along the fish) goes into the results
+   straight away: no new analysis needed. A landmark clicked outside the outline (e.g. the tail tip on a
+   transparent fin) also grows the outline at the next analysis (flag `outline_grown_to_landmarks`).
 3. With 10–30 photos clicked, **Train** makes a landmark model (YOLO-pose, `models/landmarks_vN`). **Start from**
    chooses where it starts: the small public `yolo11n-pose.pt` weights (downloaded once and checked against their
    SHA-256), or **Ritocco**: a landmark model of the project, e.g. `landmarks_vanderbijl.zip` from the training kit
@@ -215,8 +238,8 @@ colour) and purple (reflection), then **Import strokes from Paint**.
    uses an NVIDIA card ([MODELS_AND_TRAINING.md](MODELS_AND_TRAINING.md)). The new model is put in use; run the **Analysis** again to get SL (and
    the landmarks) on every fish. Landmarks the model is unsure of (confidence < 0.5) are left out.
    A bar shows the training rounds; it may stop before the last one when the model no longer improves.
-   **Export model… / Import model…** work as in Training (the landmarks must be the same as in the project's
-   profile). Landmark models contain neural-network weights: import only files from people you trust.
+   **Export model… / Import model…** work as in Training (the model's landmarks must be among those of the
+   project's profile; missing ones are not predicted). Landmark models contain neural-network weights: import only files from people you trust.
 4. Clicked landmarks always win over the model. The CSV column `landmarks_source` says which one was used
    (`manual`, `model`, `NA`).
 
@@ -236,18 +259,18 @@ colour) and purple (reflection), then **Import strokes from Paint**.
 | `chart_error_de00` | leave-one-out error of the chart correction (CIEDE2000) |
 | `px_per_mm`, `scale_source` | scale and where it came from (`graph_paper`, `line` = drawn on this photo, `line_folder` = drawn on another photo of the folder, `session_median`, `fixed`, `none`, `not_found`, `to_set`) |
 | `parts_included` | body parts included, e.g. `body+caudal+dorsal` |
-| `standard_length_mm` | SL, snout to end of the caudal peduncle, from the landmarks (`NA` without them) |
+| `standard_length_mm` | SL, snout to end of the caudal peduncle landmark, measured along the midline of the outline so it follows a bent fish (`NA` without the landmarks) |
 | `landmarks_source` | `manual` (clicked), `model` (landmark model) or `NA` |
-| `total_length_mm` | TL: the outline length when the whole caudal fin is in it; otherwise snout to tail tip from the landmarks; else `NA` (flag `tail_incomplete`) |
+| `total_length_mm` | TL = SL + the tail fin (end of the peduncle to the tail tip landmark, along the midline); without those landmarks, the outline length when the whole caudal fin is in it; else `NA` (flag `tail_incomplete`) |
 | `total_length_source` | `outline`, `landmarks` or `NA` |
 | `mask_length_mm` | length of the outline along the fish |
-| `caudal_length_mm` | end of the peduncle to tail tip (landmarks) |
+| `caudal_length_mm` | end of the peduncle to tail tip (landmarks), along the midline |
 | `max_depth_mm`, `depth_source` | maximum body depth: across the body at the gonopodium base (`landmarks`) or widest point of the outline (`outline`) |
-| `fish_area_mm2`, `body_area_mm2`, `body_area_source` | area of the outline; area without the caudal fin, cut at the peduncle landmark (`landmarks`) or where the outline narrows (`outline`) |
+| `fish_area_mm2`, `body_area_mm2`, `body_area_source` | area of the outline; area without the caudal fin, cut on the arc through the caudal fin base landmarks (or straight across at the peduncle landmark) (`landmarks`) or where the outline narrows (`outline`) |
 | `caudal_area_mm2` | outline after the peduncle landmark, only when the tail fin is in the outline |
 | `outline_source` | what drew the outline: `detector` (automatic), `manual` (redone in Review) or the outline model (`outline_vN`) |
 | `area_<class>_mm2` | area of each colour class (with a colour model); `NA` for an optional class that is not measured (Settings > What to measure) |
-| `pct_<class>` | % of the fish area (reflections left out) |
+| `pct_<class>` | % of the whole fish area, head included (reflections left out); colours are measured only behind the head (see 7 Training) |
 | `n_spots_<class>` | number of separate spots |
 | `spots_<class>_mm2` | area of each spot, largest first, separated by `;` |
 | `reflection_pct` | % of the fish covered by light reflections (left out of every area) |
@@ -284,6 +307,11 @@ In R, the spots of one class: `strsplit(d$spots_orange_mm2, ";")`.
 | `label_uncertain` | label read with low confidence | yes |
 | `date_mismatch` | date on the label differs from the EXIF date | |
 | `colours_uncertain` | colour model unsure on this fish (a good one to paint) | |
+| `colour_start_from_snout` | no eye landmark: colours measured from a fixed distance behind the snout | |
+| `colour_start_missing` | no eye or snout landmark: colours measured on the whole fish, head included | |
+| `scale_off_session` | px/mm further from the median of the folder than Settings > Scale > Check | yes |
+| `size_off_session` | fish length further from the median of the folder than Settings > Scale > Check | yes |
+| `outline_grown_to_landmarks` | a landmark was outside the outline (e.g. the tail tip): the outline was grown to include it | |
 | `overexposed` | more than 1% of the fish has max(R,G,B) ≥ 250 | |
 | `blurry` | sharpness below 40% of the session median | |
 | `sl_landmarks_missing` | landmarks present but snout or end of the peduncle missing: no SL | |
