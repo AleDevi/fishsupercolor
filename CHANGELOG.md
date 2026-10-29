@@ -32,6 +32,14 @@
   that share in the model (`class_share`, used by app 0.13.0 Ritocco) and teaches the landmark model the top and
   bottom of the caudal fin base. Use the latest kit.
 
+## 0.15.0 (2026-10-29)
+- **The eye is never black, also without a scale**: on photos without a scale in mm (no graph paper, e.g. the van
+  der Bijl photos) the head used to stay in the colours, so the eye counted as black. Now the colours start at 25% of
+  the fish length from the snout (SL, else the outline length; `fallback_share` in the profile), with the flag
+  `colour_start_from_length`. Click **Start analysis**: only the photos that kept their head are measured again.
+- Training > **Show what the model sees** leaves out the head as the analysis does (before, it showed the model's
+  raw guess, eye included).
+
 ## 0.14.1 (2026-10-29)
 - Review > Scale: after **Calibrate manually** the view shows the line you drew (not the automatic 2 cm line any
   more) and says that the lengths in mm are already updated: a scale set by hand never needs a new analysis.

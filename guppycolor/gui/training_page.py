@@ -390,6 +390,12 @@ class TrainingPage(QWidget):
         big[by0:by1, bx0:bx1] = lab
         shown = [b['index'] for b in self.brushes if b['key'] != 'base']     # off classes count as body without colour
         big[~np.isin(big, shown)] = 0
+        r = self.project.load_result(photo)
+        if r:                                       # the head is left out of the colours, as in the analysis
+            from .. import pipeline
+            head, _ = pipeline.colour_head(self.project, r, big.shape)
+            if head is not None:
+                big[head] = 0
         self.view.set_prediction(big[y0:y1, x0:x1])
 
     def clear(self):

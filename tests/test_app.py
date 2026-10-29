@@ -351,3 +351,19 @@ def test_neural_networks_fall_back_to_the_processor():
         has_gpu = False
     if not has_gpu:
         assert segment.device() == 'cpu' and 'processor' in segment.device_text()
+
+
+def test_colours_that_kept_the_head_are_measured_again(tmp_path):
+    """Photos measured before 0.15 without a scale kept the head in the colours: they become pending once."""
+    from guppycolor.project import Project
+    folder = tmp_path / 'f'
+    folder.mkdir()
+    photo = str(folder / 'a.jpg')
+    open(photo, 'wb').close()
+    p = Project.create(str(tmp_path / 'p'), 'P', [str(folder)])
+    r = {'path': photo, 'folder': str(folder), 'file': 'a.jpg', 'settings_hash': p.settings_hash(),
+         'source_mtime': os.path.getmtime(photo), 'flags': 'colour_start_missing'}
+    p.save_result(photo, r)
+    assert p.pending()
+    p.save_result(photo, dict(r, colour_start_rule=2))
+    assert not p.pending()

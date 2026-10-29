@@ -12,7 +12,7 @@
     {"key": "iridescent", "label": "Iridescent (blue, violet, white, green)", "display": "#3D7FD6",
      "optional": true}
   ],
-  "colour_start": {"landmark": "eye", "offset_mm": 2.0, "fallback_landmark": "snout", "fallback_mm": 3.5},
+  "colour_start": {"landmark": "eye", "offset_mm": 2.0, "fallback_landmark": "snout", "fallback_mm": 3.5, "fallback_share": 0.25},
   "landmarks": [
     {"key": "snout", "label": "Snout tip", "required": true, "procrustes": true},
     {"key": "eye", "label": "Eye centre", "required": false, "procrustes": true},

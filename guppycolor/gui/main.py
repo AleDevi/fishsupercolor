@@ -41,7 +41,8 @@ FLAG_LABEL = {
     'size_off_session': 'the fish length differs from the other fish of this folder (Settings > Scale > Check): '
                         'check the scale and the outline',
     'colour_start_from_snout': 'no eye landmark: the colours start at a fixed distance from the snout (click the eye in Landmarks)',
-    'colour_start_missing': 'no eye or snout, or no scale: the head is not left out of the colours',
+    'colour_start_from_length': 'no scale in mm: the colours start at a share of the fish length from the snout',
+    'colour_start_missing': 'no snout or no fish length: the head is not left out of the colours',
     'tail_incomplete': 'caudal fin not all in the outline: add it (Fish view), or mark the tail tip on screen 8 for TL',
     'date_mismatch': 'the date on the label differs from the date the photo was taken',
     'overexposed': 'more than 1% of the fish is burnt out (white)',

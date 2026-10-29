@@ -156,8 +156,11 @@ class Project:
         os.replace(tmp, p)
 
     def is_current(self, photo, result):
+        # colours measured before 0.15 without a scale kept the head (eye counted as black): measured again once
+        stale_head = bool(result) and 'colour_start_missing' in (result.get('flags') or '') \
+            and not result.get('colour_start_rule')
         return (result is not None and result.get('settings_hash') == self.settings_hash()
-                and result.get('source_mtime') == os.path.getmtime(photo))
+                and result.get('source_mtime') == os.path.getmtime(photo) and not stale_head)
 
     def pending(self):
         """Photos never analysed, changed on disk, or analysed with different settings."""

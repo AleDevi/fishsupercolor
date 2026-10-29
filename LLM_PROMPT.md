@@ -82,17 +82,17 @@ for, how it is built, the rules every change must follow, and how to organise th
 
 ### Current state (generated)
 
-- Version: **0.14.1** (`guppycolor/__init__.py` and `pyproject.toml`).
+- Version: **0.15.0** (`guppycolor/__init__.py` and `pyproject.toml`).
 - Target Python: **3.12** on Windows (tests and installer). Pinned in `requirements.in`: `ultralytics==8.4.183`.
 - App screens (README, Workflow): 1 Project; 2 Settings; 3 Analysis; 4 Review; 5 Results; 6 Pattern and clusters; 7 Training (colour classes); 8 Landmarks.
 
 #### Recent versions (CHANGELOG)
 
 - **Unreleased**: New `training_kit/` (separate from the app, not in its release zip): standalone…
+- **0.15.0 (2026-10-29)**: The eye is never black, also without a scale: on photos without a scale in mm (no graph…; Training > Show what the model sees leaves out the head as the analysis does (before, it…
 - **0.14.1 (2026-10-29)**: Review > Scale: after Calibrate manually the view shows the line you drew (not the…; A scale set by hand is no longer flagged `scale_off_session`.
 - **0.14.0 (2026-10-29)**: The app uses an NVIDIA graphics card: on a PC with one, `install_windows.bat` now…; 3 Analysis says where it runs (*Runs on: graphics card …* or *processor*), the seconds…
 - **0.13.0 (2026-10-29)**: SL and TL follow the fish: SL goes from the snout to the end of the caudal peduncle…; Rounded end of the peduncle: two new optional landmarks, *top* and *bottom of the caudal…; Colours start behind the head: 2 mm behind the eye landmark; Landmarks guide the outline: a landmark outside the outline (typically the tail tip on a…; Review: Accept / Exclude / size only / size + colour are now in a box *The whole photo…; Size check against the folder: Settings > Scale > *Check* (default 10 %) sends to Review…; Colour Ritocco keeps the true share of each class: the new model no longer paints more…; Settings > Fish ID: the formats are explained (`\d`, `{3}`, `/`) and Try the formats on…; Training says when Settings measures size only, with a button to measure colours again.
-- **0.12.0 (2026-10-27)**: Optional colour classes: the iridescent class is now optional (`"optional": true` in the…; Ritocco for colour models: Training > Start from: a colour model that keeps its training…; Import model (colours) accepts a model with only some of the project's classes (e.g.…; New guide `MODELS_AND_TRAINING.md`: which models exist, where they are saved, which file…
 
 #### Planned (CHANGELOG)
 
@@ -158,7 +158,7 @@ for, how it is built, the rules every change must follow, and how to organise th
 
 #### Tests
 
-- `test_app.py` (24), `test_gui.py` (5), `test_labels.py` (8), `test_landmarks.py` (19), `test_modelshare.py` (3), `test_outline.py` (5), `test_pattern.py` (8), `test_training.py` (12), `test_training_kit.py` (10).
+- `test_app.py` (25), `test_gui.py` (5), `test_labels.py` (8), `test_landmarks.py` (19), `test_modelshare.py` (3), `test_outline.py` (5), `test_pattern.py` (8), `test_training.py` (12), `test_training_kit.py` (10).
 
 <!-- AUTO:END -->
 

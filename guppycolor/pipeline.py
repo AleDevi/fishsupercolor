@@ -345,7 +345,27 @@ def save_manual_mask(project, photo, mask):
     cv2.imwrite(manual_mask_path(project, photo), mask.astype(np.uint8) * 255)
 
 
-COLOUR_FLAGS = ('colours_uncertain', 'colour_start_from_snout', 'colour_start_missing')
+COLOUR_FLAGS = ('colours_uncertain', 'colour_start_from_snout', 'colour_start_from_length', 'colour_start_missing')
+
+
+def colour_head(project, r, shape):
+    """The head before the profile's colour start (e.g. 2 mm behind the eye), as a bool mask of the photo, or None;
+    sets r['colour_start_line'] and r['colour_start_source'] and returns (head, flags). Used by the analysis and by
+    the Training screen, so both leave out the same head."""
+    prof = profile.load(project.settings['profile'])
+    start = sizes.colour_start(r, r.get('landmarks'), prof, r.get('px_per_mm'))
+    r.pop('colour_start_line', None)
+    r['colour_start_source'] = start[2] if start else None
+    r['colour_start_rule'] = 2                      # 2: a share of the fish length when there is no scale
+    if not start:
+        return None, (['colour_start_missing'] if prof.get('colour_start') else [])
+    point, u, src = start
+    n = (-u[1], u[0])
+    half = 0.5 * float(r.get('max_depth_px') or (r.get('outline') or {}).get('max_depth_px') or 100)
+    r['colour_start_line'] = [[round(point[0] - half * n[0], 1), round(point[1] - half * n[1], 1)],
+                              [round(point[0] + half * n[0], 1), round(point[1] + half * n[1], 1)]]
+    flags = {'snout': ['colour_start_from_snout'], 'length_share': ['colour_start_from_length']}.get(src, [])
+    return sizes.ahead_of(shape, point, u), flags
 
 
 def measure_colours(project, r, corrected, mask):
@@ -353,24 +373,8 @@ def measure_colours(project, r, corrected, mask):
     profile's colour start (e.g. 2 mm behind the eye) counts as fish without colour."""
     from . import training
     cs = project.settings['colours']
-    prof = profile.load(project.settings['profile'])
     forest = training.load_model(project, cs['model'])
-    flags = []
-    start = sizes.colour_start(r, r.get('landmarks'), prof, r.get('px_per_mm'))
-    head = None
-    r.pop('colour_start_line', None)
-    if start:
-        point, u, src = start
-        head = sizes.ahead_of(mask.shape, point, u)
-        n = (-u[1], u[0])
-        half = 0.5 * float(r.get('max_depth_px') or 100)
-        r['colour_start_line'] = [[round(point[0] - half * n[0], 1), round(point[1] - half * n[1], 1)],
-                                  [round(point[0] + half * n[0], 1), round(point[1] + half * n[1], 1)]]
-        if src == 'snout':
-            flags.append('colour_start_from_snout')
-    elif prof.get('colour_start'):
-        flags.append('colour_start_missing')
-    r['colour_start_source'] = start[2] if start else None
+    head, flags = colour_head(project, r, mask.shape)
     colori, labmap, conf = training.measure_colours(corrected, mask, forest, r.get('px_per_mm') if r.get('scale_ok') else None,
                                                    cs.get('merge_mm', 0), cs.get('min_spot_mm2', 0),
                                                    training.classes_off(project), head=head)

@@ -101,20 +101,27 @@ def body_end(ped, u, top=None, bottom=None):
 def colour_start(r, pts, prof, ppm):
     """Where the colours start (the head is left out, so the eye never counts as black): a point and the body axis,
     with the line across the fish through the point as the cut. From the profile's colour_start (e.g. 2 mm behind the
-    eye landmark); without that landmark, a fixed distance from the snout. Returns (point, axis, source) or None
-    (source: the landmark used, or 'snout'); None also when the profile has no colour_start."""
+    eye landmark); without that landmark, a fixed distance from the snout; without a scale, a share of the fish
+    length (SL, else the outline length) from the snout. Returns (point, axis, source) or None (source: the landmark
+    used, 'snout' or 'length_share'); None also when the profile has no colour_start."""
     cs = prof.get('colour_start')
     pts = pts or {}
     u = body_axis(r, pts)
-    if not cs or u is None or not ppm:
+    if not cs or u is None:
         return None
     lm = cs.get('landmark')
-    if lm in pts:
+    if ppm and lm in pts:
         return (np.asarray(pts[lm], float) + float(cs.get('offset_mm', 0)) * ppm * u).tolist(), u.tolist(), lm
     snout = pts.get(cs.get('fallback_landmark', 'snout')) or (r.get('outline') or {}).get('snout')
-    if snout is None or cs.get('fallback_mm') is None:
+    if snout is None:
         return None
-    return (np.asarray(snout, float) + float(cs['fallback_mm']) * ppm * u).tolist(), u.tolist(), 'snout'
+    if ppm and cs.get('fallback_mm') is not None:
+        return (np.asarray(snout, float) + float(cs['fallback_mm']) * ppm * u).tolist(), u.tolist(), 'snout'
+    length = r.get('standard_length_px') or (r.get('outline') or {}).get('mask_length_px') or r.get('mask_length_px')
+    if cs.get('fallback_share') is None or not length:
+        return None
+    return (np.asarray(snout, float) + float(cs['fallback_share']) * float(length) * u).tolist(), u.tolist(), \
+        'length_share'
 
 
 def ahead_of(shape, point, axis):

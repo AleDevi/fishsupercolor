@@ -202,8 +202,10 @@ Landmarks clicked in screen 8 (or placed by the landmark model) are used: the sn
 
 **Colours start behind the head.** Colours are measured from a line across the fish 2 mm behind the eye landmark
 (the eye is never black); the head in front of it counts as body without colour, so percentages are of the whole
-fish. Without an eye landmark the line is 3.5 mm behind the snout (flag `colour_start_from_snout`); without either,
-the whole fish is measured (flag `colour_start_missing`). The landmark and distances are in the profile
+fish. Without an eye landmark the line is 3.5 mm behind the snout (flag `colour_start_from_snout`); without a scale in
+mm, at 25% of the fish length (SL, else the outline length) from the snout (flag `colour_start_from_length`); without
+a snout, the whole fish is measured (flag `colour_start_missing`). **Show what the model sees** leaves out the same
+head. The landmark and distances are in the profile
 (`colour_start`). The line is drawn in yellow, dotted, in 5 Results.
 
 **Size only.** When Settings says size only on every fish, the screen says so and **Measure colours on every fish**
@@ -318,7 +320,8 @@ In R, the spots of one class: `strsplit(d$spots_orange_mm2, ";")`.
 | `date_mismatch` | date on the label differs from the EXIF date | |
 | `colours_uncertain` | colour model unsure on this fish (a good one to paint) | |
 | `colour_start_from_snout` | no eye landmark: colours measured from a fixed distance behind the snout | |
-| `colour_start_missing` | no eye or snout landmark: colours measured on the whole fish, head included | |
+| `colour_start_from_length` | no scale in mm: colours measured from 25% of the fish length behind the snout | |
+| `colour_start_missing` | no snout or no fish length: colours measured on the whole fish, head included | |
 | `scale_off_session` | px/mm further from the median of the folder than Settings > Scale > Check | yes |
 | `size_off_session` | fish length further from the median of the folder than Settings > Scale > Check | yes |
 | `outline_grown_to_landmarks` | a landmark was outside the outline (e.g. the tail tip): the outline was grown to include it | |

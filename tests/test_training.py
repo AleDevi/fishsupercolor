@@ -268,6 +268,13 @@ def test_colours_start_behind_the_eye(spotted):
     prof = dict(profile.load('guppy_male'))
     prof.pop('colour_start')
     assert sizes.colour_start(r, r['landmarks'], prof, PX_PER_MM) is None
+    # no scale in mm: the eye cannot be used, the cut falls at a share of SL from the snout
+    prof = profile.load('guppy_male')
+    point, _, src = sizes.colour_start(r, r['landmarks'], prof, None)
+    assert src == 'length_share'
+    assert point[0] == pytest.approx(645 + prof['colour_start']['fallback_share'] * r['standard_length_px'], abs=2)
+    prof = dict(prof, colour_start={k: v for k, v in prof['colour_start'].items() if k != 'fallback_share'})
+    assert sizes.colour_start(r, r['landmarks'], prof, None) is None
 
 
 def test_ritocco_keeps_the_true_share_of_each_class():
