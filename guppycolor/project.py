@@ -37,7 +37,9 @@ DEFAULT_SETTINGS = {
     'analysis': {'default': 'size_colour', 'size_only_folders': [], 'size_only_pattern': ''},
     'training': {'annotator': ''},
     'landmarks': {'model': ''},     # YOLO-pose model trained in screen 8 ('' = only landmarks clicked by hand)
-    'outline': {'model': ''},       # imported outline model (outline_vN); '' = zero-training detector (YOLOE + SAM)
+    'outline': {'model': ''},
+    # Review aids, not measures (so not in the settings hash): flag photos this % away from their session's median
+    'checks': {'session_pct': 10},       # imported outline model (outline_vN); '' = zero-training detector (YOLOE + SAM)
 }
 
 # Settings that change the numbers: a change makes earlier results stale.

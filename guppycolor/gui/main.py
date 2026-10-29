@@ -2,6 +2,7 @@
 Landmarks)."""
 import html
 import os
+import re
 import sys
 
 import numpy as np
@@ -35,6 +36,10 @@ FLAG_LABEL = {
     'area_outlier': 'area very different from the other fish of the session',
     'label_uncertain': 'label read with low confidence: check the id',
     'colours_uncertain': 'the colour model is unsure on this fish: a good photo to paint in Training',
+    'scale_off_session': 'the scale differs from the other photos of this folder (Settings > Scale > Check): '
+                         'confirm it or calibrate by hand',
+    'size_off_session': 'the fish length differs from the other fish of this folder (Settings > Scale > Check): '
+                        'check the scale and the outline',
     'colour_start_from_snout': 'no eye landmark: the colours start at a fixed distance from the snout (click the eye in Landmarks)',
     'colour_start_missing': 'no eye or snout, or no scale: the head is not left out of the colours',
     'tail_incomplete': 'caudal fin not all in the outline: add it (Fish view), or mark the tail tip on screen 8 for TL',
@@ -247,6 +252,18 @@ class SettingsPage(QWidget):
         row.addWidget(b)
         row.addStretch()
         gl.addLayout(row)
+        row = QHBoxLayout()
+        row.addWidget(QLabel('Check: send to Review the photos whose scale or fish length differs from the median of '
+                             'their folder by more than'))
+        self.session_pct = QDoubleSpinBox()
+        self.session_pct.setRange(0, 100)
+        self.session_pct.setDecimals(0)
+        self.session_pct.setSuffix(' %')
+        self.session_pct.setToolTip('0 = no check. Fish of very different sizes in one folder: raise it.')
+        self.session_pct.valueChanged.connect(self.changed)
+        row.addWidget(self.session_pct)
+        row.addStretch()
+        gl.addLayout(row)
         lay.addWidget(g)
         g = QGroupBox('Fish outline')
         gl = QVBoxLayout(g)
@@ -342,8 +359,15 @@ class SettingsPage(QWidget):
         b_print = QPushButton('Print labels with QR code…')
         b_print.clicked.connect(self.print_labels)
         gl.addRow(b_print)
-        gl.addRow(note('Formats are regular expressions: M\\d{3} = M followed by 3 digits. '
-                       'With the list of valid ids, misread labels are corrected. EXIF data (date taken, camera, '
+        gl.addRow(note(FORMAT_HELP))
+        self.try_text = QLineEdit()
+        self.try_text.setPlaceholderText('type a label as written, e.g. G4 20/03 M116')
+        self.try_text.textChanged.connect(self.try_formats)
+        gl.addRow('Try the formats on', self.try_text)
+        self.try_result = QLabel('')
+        self.try_result.setWordWrap(True)
+        gl.addRow(self.try_result)
+        gl.addRow(note('With the list of valid ids, misread labels are corrected. EXIF data (date taken, camera, '
                        'exposure, ISO, focal length) always go in the CSV.'))
         lay.addWidget(g)
         # what to measure
@@ -377,6 +401,7 @@ class SettingsPage(QWidget):
         for b in self.sc.buttons():
             b.setChecked(b.property('key') == st['scale']['mode'])
         self.ppm.setValue(float(st['scale'].get('px_per_mm') or 0))
+        self.session_pct.setValue(float(st.get('checks', {}).get('session_pct') or 0))
         for b in self.head.buttons():
             b.setChecked(b.property('key') == st.get('head', 'left'))
         for k, c in self.parts.items():
@@ -406,6 +431,22 @@ class SettingsPage(QWidget):
         self.loading = False
         self.refresh_labels()
 
+    def try_formats(self, *_):
+        text = self.try_text.text()
+        if not text.strip():
+            self.try_result.setText('')
+            return
+        out = []
+        for key, name in (('male_id', 'id'), ('group', 'group'), ('date', 'date')):
+            fmt = self.lab_fields[key].text().strip()
+            try:
+                m = re.search(fmt, text) if fmt else None
+            except re.error:
+                out.append(f'{name}: the format is not valid')
+                continue
+            out.append(f'{name}: <b>{html.escape(m.group(0))}</b>' if m else f'{name}: not found')
+        self.try_result.setText(' · '.join(out))
+
     def refresh_labels(self):
         p = self.win.project
         ref = p.settings['colour'].get('reference_photo')
@@ -431,6 +472,7 @@ class SettingsPage(QWidget):
                                                  else 'the pattern does not match this name'))
         else:
             self.example.setText('The parts in braces become CSV columns. Name one {id} to use it as the fish id.')
+        self.try_formats()
 
     def fill_outline_models(self, p):
         from .. import outline
@@ -488,6 +530,7 @@ class SettingsPage(QWidget):
         st['colour']['mode'] = self.col.checkedButton().property('key') if self.col.checkedButton() else 'none'
         st['scale']['mode'] = self.sc.checkedButton().property('key') if self.sc.checkedButton() else 'auto'
         st['scale']['px_per_mm'] = self.ppm.value() or None
+        st.setdefault('checks', {})['session_pct'] = self.session_pct.value()
         st['head'] = self.head.checkedButton().property('key') if self.head.checkedButton() else 'left'
         st['parts'] = {k: c.isChecked() for k, c in self.parts.items()}
         st['outline']['model'] = self.outline_model.currentData() or ''
@@ -717,9 +760,26 @@ LABEL_FLAGS = {'label_uncertain', 'date_mismatch'}
 VIEWS = ('Fish', 'Label', 'Scale')
 
 
+def label_summary(r):
+    """What the label reader found, field by field, and the rest of the text it read (not used)."""
+    esc = lambda v: html.escape(str(v)) if v else '<i>not found</i>'
+    src = {'qr': 'QR code', 'ocr': 'written text', 'filename': 'file name', 'table': 'data table',
+           'sequence': 'neighbouring photos', 'manual': 'typed in Review'}.get(r.get('label_source'), 'nothing')
+    out = (f"Id: <b>{esc(r.get('label_id'))}</b> · group: {esc(r.get('label_group'))} · date: "
+           f"{esc(r.get('label_date'))} <span style='color:#4F5761'>(from the {src})</span>")
+    others = [c for c in (r.get('label_candidates') or []) if c != r.get('label_id')]
+    if others:
+        out += '<br>Other possible readings of the id: ' + ', '.join(html.escape(c) for c in others) + \
+               ' (pick one in the box)'
+    if r.get('label_text'):
+        out += ('<br><span style="color:#4F5761">All the text read on the label, only the fields above are used: '
+                + html.escape(r['label_text']) + '</span>')
+    return out
+
+
 def view_of(flag):
     """Which part of the photo a flag is about."""
-    if flag in scaleline.SCALE_FLAGS:
+    if flag in scaleline.SCALE_FLAGS or flag in pipeline.SESSION_FLAGS:
         return 'Scale'
     return 'Label' if flag in LABEL_FLAGS else 'Fish'
 
@@ -782,11 +842,15 @@ class ReviewPage(QWidget):
         ll.setContentsMargins(0, 0, 0, 0)
         self.lab_text = QLabel()
         self.lab_text.setWordWrap(True)
-        self.lab_id = QLineEdit()
-        self.lab_id.setPlaceholderText('fish id')
+        self.lab_text.setTextFormat(Qt.RichText)
+        self.lab_id = QComboBox()
+        self.lab_id.setEditable(True)
+        self.lab_id.setMinimumWidth(140)
+        self.lab_id.setToolTip('The id read, the other readings of the label (pick one) or type it')
+        self.lab_id.lineEdit().setPlaceholderText('fish id')
         b_lab = QPushButton('Save id')
         b_lab.clicked.connect(self.save_label)
-        self.lab_id.returnPressed.connect(self.save_label)
+        self.lab_id.lineEdit().returnPressed.connect(self.save_label)
         ll.addWidget(self.lab_text, 1)
         ll.addWidget(self.lab_id)
         ll.addWidget(b_lab)
@@ -806,10 +870,12 @@ class ReviewPage(QWidget):
         sl.addWidget(self.b_cal)
         self.tools.addWidget(sc)
         rl.addWidget(self.tools)
-        row = QHBoxLayout()
-        for text, fn in (('Accept (Enter)', lambda: self.decide('reviewed')), ('Exclude the photo', lambda: self.decide('excluded')),
-                         ('Size only', lambda: self.set_analysis('size')),
-                         ('Size + colour', lambda: self.set_analysis('size_colour')),
+        whole = QGroupBox('The whole photo (all views): when everything above is fixed')
+        row = QHBoxLayout(whole)
+        for text, fn in (('Accept the photo (Enter)', lambda: self.decide('reviewed')),
+                         ('Exclude the photo', lambda: self.decide('excluded')),
+                         ('Measure size only', lambda: self.set_analysis('size')),
+                         ('Measure size + colour', lambda: self.set_analysis('size_colour')),
                          ('Open the original', self.open_original)):
             b = QPushButton(text)
             b.clicked.connect(fn)
@@ -817,7 +883,7 @@ class ReviewPage(QWidget):
             if text.startswith('Accept'):
                 b.setShortcut(Qt.Key_Return)
         row.addStretch()
-        rl.addLayout(row)
+        rl.addWidget(whole)
         split.addWidget(right)
         split.setSizes([260, 800])
         lay.addWidget(split, 1)
@@ -827,7 +893,7 @@ class ReviewPage(QWidget):
 
     def show_project(self, p):
         order = {'error': 0, 'to_check': 1}
-        self.items = sorted((r for r in p.results() if r.get('status') in order or r['path'] == self.keep),
+        self.items = sorted((r for r in pipeline.session_checks(p) if r.get('status') in order or r['path'] == self.keep),
                             key=lambda r: (order.get(r['status'], 2), -len((r.get('flags') or '').split(';'))))
         self.list.clear()
         for r in self.items:
@@ -898,9 +964,13 @@ class ReviewPage(QWidget):
             else:                               # not found: the whole photo, to read it anywhere
                 box = [0, 0, pm_full.width(), pm_full.height()]
             pm = pm_full.copy(box[0], box[1], box[2] - box[0], box[3] - box[1])
-            self.lab_id.setText(r.get('label_id') or '')
-            self.lab_text.setText('Read on the label: ' + (r.get('label_text') or 'no text') +
-                                  ('' if b else '\n(label not found: the whole photo is shown)'))
+            self.lab_id.clear()
+            for c in dict.fromkeys([r.get('label_id')] + list(r.get('label_candidates') or [])):
+                if c:
+                    self.lab_id.addItem(c)
+            self.lab_id.setEditText(r.get('label_id') or '')
+            self.lab_text.setText(label_summary(r) + ('' if b else '<br><i>Label not found: the whole photo is '
+                                                                   'shown.</i>'))
         else:
             pm = load_pixmap(r['path'])
             box = [0, 0, pm.width(), pm.height()]
@@ -964,7 +1034,9 @@ class ReviewPage(QWidget):
 
     def after_scale(self, r, msg=None):
         i = self.list.currentRow()
+        self.keep = r['path']               # stay on this photo: the other views may still need a look
         self.show_project(self.win.project)
+        self.keep = None
         rows = [j for j, it in enumerate(self.items) if it['path'] == r['path']]
         if rows:
             self.list.setCurrentRow(rows[0])
@@ -975,9 +1047,9 @@ class ReviewPage(QWidget):
 
     def save_label(self):
         i = self.list.currentRow()
-        if not 0 <= i < len(self.items) or not self.lab_id.text().strip():
+        if not 0 <= i < len(self.items) or not self.lab_id.currentText().strip():
             return
-        self.win.project.set_label_id(self.items[i]['path'], self.lab_id.text().strip().upper())
+        self.win.project.set_label_id(self.items[i]['path'], self.lab_id.currentText().strip().upper())
         self.items[i] = self.win.project.load_result(self.items[i]['path'])
         self.show_item(i)
 
@@ -1089,6 +1161,11 @@ def measures_legend():
 
 
 LANDMARK_COLOUR = '#2979FF'
+FORMAT_HELP = ('How to write a format: letters stand for themselves (M is the letter M); \\d is one digit (0–9); '
+               'a number in braces repeats what comes just before it: \\d{3} = exactly 3 digits, \\d{1,2} = 1 or 2 '
+               'digits; / and - are themselves. Examples: M\\d{3} finds M116; G\\d{1,2} finds G4 and G12; '
+               '\\d{1,2}/\\d{2} finds 20/03. (Braces mean something else in the file-name pattern above: there '
+               '{id} names a part of the name.) Try a label in the box below.')
 COLOUR_START_COLOUR = '#FFD600'
 
 

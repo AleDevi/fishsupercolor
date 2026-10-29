@@ -141,6 +141,7 @@ def fake_read_labels(path, expected_ids=None, patterns=None):
     return {'text_raw': 'G4 20/03 M1I6' if uncertain else 'G4 | 20/03 | M116', 'male_id': 'M116',
             'group': 'G4', 'date': '20/03', 'confidence': 0.4 if uncertain else 0.95,
             'needs_review': uncertain, 'source': 'ocr', 'label_box': (10, 10, 100, 40),
+            'id_candidates': [['M116', 0.4], ['M117', 0.3]] if uncertain else [['M116', 0.95]],
             'seen_expected': expected_ids}
 
 
@@ -272,3 +273,23 @@ def test_id_from_file_name(photos):
         r = {r['file']: r for r in csv.DictReader(f)}['M1_B2_2026-10-20.jpg']
     assert r['label_id'] == 'M1' and r['label_source'] == 'filename'
     assert r['total_length_mm'] == 'NA' or float(r['total_length_mm']) > 0
+
+
+def test_session_check_flags_a_scale_far_from_the_others(tmp_path):
+    from guppycolor import pipeline
+    from guppycolor.project import Project
+    folder = tmp_path / 'f'
+    folder.mkdir()
+    p = Project.create(str(tmp_path / 'p'), 'P', [str(folder)])
+    for i, ppm in enumerate((20.0, 20.4, 19.8, 25.0)):
+        photo = str(folder / f'{i}.jpg')
+        open(photo, 'wb').close()
+        p.save_result(photo, {'path': photo, 'folder': str(folder), 'file': f'{i}.jpg', 'status': 'ok', 'flags': '',
+                              'px_per_mm': ppm, 'standard_length_px': 15 * 20.0})
+    rs = {r['file']: r for r in pipeline.session_checks(p)}
+    assert rs['3.jpg']['status'] == 'to_check' and 'scale_off_session' in rs['3.jpg']['flags']
+    assert 'size_off_session' in rs['3.jpg']['flags']           # 15 mm at 20 px/mm looks 12 mm at 25
+    assert all(rs[f]['status'] == 'ok' and not rs[f]['flags'] for f in ('0.jpg', '1.jpg', '2.jpg'))
+    p.settings['checks']['session_pct'] = 30
+    rs = {r['file']: r for r in pipeline.session_checks(p)}
+    assert rs['3.jpg']['status'] == 'ok' and not rs['3.jpg']['flags']

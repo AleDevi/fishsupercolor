@@ -165,6 +165,19 @@ class TrainingPage(QWidget):
         hint.setWordWrap(True)
         hint.setStyleSheet('color: #4F5761')
         lay.addWidget(hint)
+        self.size_only = QWidget()
+        so = QHBoxLayout(self.size_only)
+        so.setContentsMargins(8, 6, 8, 6)
+        self.size_only.setStyleSheet('background: #FFF3CD; border-radius: 4px')
+        msg = QLabel('Settings > What to measure is set to <b>size only</b>: the analysis does not measure colours, '
+                     'so a colour model is not used (except on folders or photos set to colour). Train here only if '
+                     'you want colours.')
+        msg.setWordWrap(True)
+        so.addWidget(msg, 1)
+        b_on = QPushButton('Measure colours on every fish')
+        b_on.clicked.connect(self.colours_on)
+        so.addWidget(b_on)
+        lay.addWidget(self.size_only)
         split = QSplitter()
 
         left = QWidget()
@@ -269,8 +282,14 @@ class TrainingPage(QWidget):
         self.keys = []
 
     # ---------------------------------------------------------------- project
+    def colours_on(self):
+        self.project.settings['analysis']['default'] = 'size_colour'
+        self.project.save()
+        self.size_only.hide()
+
     def show_project(self, p):
         self.project = p
+        self.size_only.setVisible(p.settings['analysis'].get('default') == 'size')
         prof = profile.load(p.settings['profile'])
         self.brushes = training.active_brushes(p, prof)
         self.view.colours = {b['index']: training.vis_colour(b) for b in self.brushes}

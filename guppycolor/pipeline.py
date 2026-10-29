@@ -3,6 +3,7 @@ Results are stored in pixels; conversion to mm happens at export, so a doubtful 
 to the median of its session without re-analysing."""
 import csv
 import os
+import statistics
 import time
 
 import cv2
@@ -93,8 +94,9 @@ def correct_colour(img, settings, reference):
     return colour.apply_tps(colour.fit_tps(meas, None if mode == 'nominal' else reference), img), info, flags
 
 
+SESSION_FLAGS = ('scale_off_session', 'size_off_session')
 SERIOUS = {'label_uncertain', 'fish_at_border', 'mask_in_pieces', 'unusual_shape', 'scale_doubtful', 'scale_not_found',
-           'scale_to_set', 'reference_missing'}       # these send the photo to Review
+           'scale_to_set', 'reference_missing', *SESSION_FLAGS}       # these send the photo to Review
 
 
 def find_scale(img, mask, settings):
@@ -216,6 +218,7 @@ def label_fields(res):
             'label_group': res.get('group'), 'label_date': res.get('date'),
             'label_confidence': round(float(res.get('confidence') or 0), 3), 'label_source': res.get('source'),
             'label_needs_review': bool(res.get('needs_review')),
+            'label_candidates': [str(t) for t, _ in (res.get('id_candidates') or [])][:4],
             'label_box': list(res['label_box']) if res.get('label_box') else None}
 
 
@@ -530,4 +533,35 @@ def run(project, segmenter=None, progress=None, stop=None):
                     label=from_table.get(photo))
         if progress is not None:
             progress(i + 1, len(todo), r)
+    session_checks(project)
     return len(todo)
+
+
+def session_checks(project, results=None):
+    """Flag the photos whose scale (px/mm) or fish length (SL, else outline length, in mm) is more than
+    checks.session_pct % away from the median of their session (folder), so a wrong scale shows in Review. Needs 3
+    photos in the session. Updates and saves only the results that change; returns the results."""
+    pct = float((project.settings.get('checks') or {}).get('session_pct') or 0) / 100
+    results = project.results() if results is None else results
+    by = {}
+    for r in results:
+        if r.get('status') != 'error' and r.get('review') != 'excluded' and r.get('px_per_mm'):
+            by.setdefault(r['folder'], []).append(r)
+    length = lambda r: (r.get('standard_length_px') or r.get('mask_length_px') or 0) / r['px_per_mm']
+    for r in results:
+        old = [f for f in (r.get('flags') or '').split(';') if f]
+        flags = [f for f in old if f not in SESSION_FLAGS]
+        group = by.get(r.get('folder'), [])
+        if pct > 0 and r in group and len(group) >= 3:
+            ppm = statistics.median(o['px_per_mm'] for o in group)
+            if abs(r['px_per_mm'] / ppm - 1) > pct:
+                flags.append('scale_off_session')
+            lens = [length(o) for o in group if length(o) > 0]
+            if lens and length(r) > 0 and abs(length(r) / statistics.median(lens) - 1) > pct:
+                flags.append('size_off_session')
+        if flags != old:
+            r['flags'] = ';'.join(flags)
+            if not r.get('review') and r.get('status') in ('ok', 'to_check'):
+                r['status'] = 'to_check' if SERIOUS & set(flags) else 'ok'
+            project.save_result(r['path'], r)
+    return results

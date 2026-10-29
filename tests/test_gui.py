@@ -99,7 +99,9 @@ def test_label_fixed_in_review(photos, monkeypatch):
     page.views.setCurrentIndex(0)
     assert page.issues.text() == 'Nothing to check here.'
     page.views.setCurrentIndex(1)
-    page.lab_id.setText('m117')
+    assert 'M117' in page.lab_text.text() and 'All the text read' in page.lab_text.text()
+    assert [page.lab_id.itemText(k) for k in range(page.lab_id.count())] == ['M116', 'M117']
+    page.lab_id.setEditText('m117')
     page.save_label()
     assert p.load_result(page.items[0]['path'])['label_id'] == 'M117'
 

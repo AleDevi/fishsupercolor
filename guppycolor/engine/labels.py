@@ -280,7 +280,7 @@ def read_labels(image_path, expected_ids=None, patterns=None, id_table=None):
     a photo listed there takes its id from the table (the label is still read, to catch mismatches)."""
     pats = dict(PATTERNS, **(patterns or {}))
     res = dict(text_raw='', male_id=None, group=None, date=None, confidence=0.0,
-               needs_review=True, source='none', label_box=None)
+               needs_review=True, source='none', label_box=None, id_candidates=[])
     rgb, f = load(image_path)
     expected = [_norm(e) for e in expected_ids] if expected_ids else None
 
@@ -336,6 +336,7 @@ def read_labels(image_path, expected_ids=None, patterns=None, id_table=None):
             if alt > 0.5*c: c *= 1 - (alt - 0.5*c)/c   # a close runner-up lowers the confidence
             return c, t, i
         fits = {key: fit_lines([(None, pattern_slots(pat))]) for key, pat in pats.items()}
+        cands = list(fits.get('male_id') or [])
         taken = set()
         for key in sorted(fits, key=lambda k: -(fits[k][0][0] if fits[k] else 0)):   # surest field first
             cand = [x for x in fits[key] if x[2] not in taken]
@@ -348,10 +349,16 @@ def read_labels(image_path, expected_ids=None, patterns=None, id_table=None):
             # snap to the list: score every expected id on the lines not used by group/date
             other = {i for k, i in used.items() if k != 'male_id'}
             cand = fit_lines([(e, exact_slots(e)) for e in expected], skip=other)
+            cands += cand
             if cand:
                 c, t, i = pick(cand)
                 if c > res['confidence'] or res['male_id'] not in expected:
                     res.update(male_id=t, confidence=round(float(c), 3)); used['male_id'] = i
+    seen = {}
+    for c, t, _ in sorted(cands, reverse=True):          # the other readings of the id, for Review to offer
+        if t not in seen and len(seen) < 4:
+            seen[t] = round(float(c), 3)
+    res['id_candidates'] = [[t, c] for t, c in seen.items()]
     def best_text(flips):
         v = max(flips, key=lambda vs: np.mean([x[3] for x in vs]) + (0.15 if vs is flips[0] else 0))
         return max(v, key=lambda x: x[3])[2:]
