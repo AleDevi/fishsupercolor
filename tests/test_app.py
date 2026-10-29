@@ -293,3 +293,27 @@ def test_session_check_flags_a_scale_far_from_the_others(tmp_path):
     p.settings['checks']['session_pct'] = 30
     rs = {r['file']: r for r in pipeline.session_checks(p)}
     assert rs['3.jpg']['status'] == 'ok' and not rs['3.jpg']['flags']
+
+
+def test_landmark_outside_the_outline_grows_it():
+    """A tail tip clicked beyond SAM's outline (transparent fin left out) is used as a click that adds the fin."""
+    import numpy as np
+    from guppycolor import pipeline
+    img = np.zeros((200, 300, 3), np.uint8)
+    body = np.zeros((200, 300), bool)
+    body[80:120, 50:200] = True
+    fin = np.zeros_like(body)
+    fin[85:115, 200:250] = True
+    calls = []
+
+    def grow(img, mask, x, y):
+        calls.append((x, y))
+        return mask | fin if fin[y, x] else None
+
+    pts = {'snout': (51.0, 100.0), 'eye': (70.0, 95.0), 'tail_tip': (245.0, 100.0)}
+    mask, used = pipeline.guide_outline(img, body, pts, grow=grow)
+    assert used == ['tail_tip'] and calls == [(245, 100)]
+    assert mask[100, 240] and mask.sum() == body.sum() + fin.sum()
+    # a landmark just off the edge (a click on the outline) changes nothing
+    mask, used = pipeline.guide_outline(img, body, {'snout': (48.0, 100.0)}, grow=grow)
+    assert used == [] and mask is body

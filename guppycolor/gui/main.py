@@ -48,6 +48,7 @@ FLAG_LABEL = {
     'blurry': 'much less sharp than the other photos of the session',
     'sl_landmarks_missing': 'snout or end of the caudal peduncle not marked: no standard length',
     'landmark_model_error': 'the landmark model could not be used (file changed or missing)',
+    'outline_grown_to_landmarks': 'a landmark was outside the outline (e.g. the tail tip): the outline was grown to include it',
     'outline_model_missed': 'the outline model found no fish: the automatic detector drew the outline',
     'outline_model_rejected': 'the outline of the outline model looked wrong (border, pieces or shape): the '
                               'automatic detector drew a better one',

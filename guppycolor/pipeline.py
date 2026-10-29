@@ -420,6 +420,34 @@ def find_outline(project, img, segmenter=None):
     return mask, {}, conf, 'detector', flags
 
 
+def guide_outline(img, mask, points, grow=None, tolerance=0.02):
+    """Landmarks that fall outside the outline (e.g. a tail tip on a transparent caudal fin SAM left out) are used as
+    clicks to add the missing part, as "Add to the outline" does in Review. A landmark closer to the outline than
+    `tolerance` of the fish length counts as inside. Returns (mask, keys of the landmarks that grew it)."""
+    if not points or mask is None or not mask.any():
+        return mask, []
+    if grow is None:
+        from .engine import segment
+        grow = segment.add_to_mask
+    ys, xs = np.nonzero(mask)
+    near = max(3.0, tolerance * float(np.hypot(np.ptp(xs), np.ptp(ys))))
+    used = []
+    for k, (x, y) in points.items():
+        xi, yi = int(round(x)), int(round(y))
+        if not (0 <= yi < mask.shape[0] and 0 <= xi < mask.shape[1]) or mask[yi, xi]:
+            continue
+        d = cv2.distanceTransform((~mask).astype(np.uint8), cv2.DIST_L2, 5)
+        if d[yi, xi] <= near:
+            continue
+        try:
+            new = grow(img, mask, xi, yi)
+        except Exception:
+            new = None
+        if new is not None and new[yi, xi] and not touches_border(new) and new.sum() < 2 * mask.sum():
+            mask, used = new, used + [k]
+    return mask, used
+
+
 def analyse(project, folder, photo, segmenter=None, reference=None, expected_ids=None, label=None):
     """Full analysis of one photo; returns the result dict (also saved in the project)."""
     t0 = time.time()
@@ -473,6 +501,12 @@ def analyse(project, folder, photo, segmenter=None, reference=None, expected_ids
             r.update(status='error', flags=';'.join(flags + ['fish_not_found']), seconds=round(time.time() - t0, 1))
             project.save_result(photo, r)
             return r
+        flags += find_landmarks(project, photo, img, mask, r)
+        if not r.get('manual_mask') and segmenter is None:     # landmarks outside the outline add the missing part
+            mask, grown = guide_outline(img, mask, r.get('landmarks'))
+            if grown:
+                r['outline_grown_to'] = grown
+                flags.append('outline_grown_to_landmarks')
         sc, f = photo_scale(project, folder, photo, img, mask)
         r.update(sc); flags += f
         morph = morpho.measure(mask, img, head=None if st.get('head', 'left') == 'auto' else st.get('head', 'left'))
@@ -489,7 +523,6 @@ def analyse(project, folder, photo, segmenter=None, reference=None, expected_ids
                         'axis': [round(float(v), 4) for v in morph['axis']],
                         'snout': [round(float(v), 1) for v in morph['snout']],
                         'midline': np.round(np.asarray(morph['line'])[::5], 1).tolist()}
-        flags += find_landmarks(project, photo, img, mask, r)
         flags = sizes.update(r, mask, r.get('landmarks'), flags)     # landmarks win over the outline
         flags += mask_flags(mask, morph)
         r.update(image_quality(img, mask))
