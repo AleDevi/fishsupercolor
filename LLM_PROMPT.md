@@ -61,17 +61,27 @@ for, how it is built, the rules every change must follow, and how to organise th
 ## 3. How the app works
 
 - **Pipeline for one photo** (`pipeline.py`): colour correction (ColorChecker found automatically, 3D TPS to
-  nominal values or to a reference photo) → fish outline (YOLOE with the text prompt "fish" → SAM 2.1; a click in
-  Review prompts SAM instead) → scale (graph-paper grid by autocorrelation, or a line drawn by hand) → sizes
-  (outline first, landmarks win where they exist: `sizes.py`) → fish id (QR, else OCR constrained to expected
-  formats, or file name, or a data table) → colour classes (random forest trained in the app) → quality flags.
+  nominal values or to a reference photo) → fish outline (YOLOE with the text prompt "fish" → SAM 2.1, or an
+  imported outline model that draws body and caudal fin, with the automatic one as fallback; a click in Review
+  prompts SAM instead; landmarks outside the outline grow it) → scale (graph-paper grid by autocorrelation, or a
+  line drawn by hand) → sizes (outline first, landmarks win where they exist: `sizes.py`) → fish id (QR, else OCR
+  constrained to expected formats, or file name, or a data table) → colour classes (random forest trained in the
+  app, counted only behind the head: profile `colour_start`, 2 mm behind the eye, else behind the snout, else at
+  25% of the fish length without a scale; `pct_<class>` is a share of the whole fish) → quality flags.
+- **Graphics card**: the installer picks `requirements-win-cuda.txt` (CUDA builds of torch) when `nvidia-smi`
+  works; outline, landmarks and landmark training then run on the card (`segment.device()`), everything else on
+  the processor. Results must not depend on where they ran.
 - **Pixels until the export**: results are stored in pixels per photo (`results/<photo>.json`); conversion to mm
   happens in `export.py`, so a doubtful scale can fall back to the session median without a new analysis.
 - **Project** = one experiment = one folder (`project.json`, results, masks, models, exports). Photo folders
   (sessions) are added over time; only new or changed photos are analysed. Photos are never modified.
 - **Models trained in the app**: colour classes (random forest stored as plain `.npz` arrays, evaluated with
-  numpy) and landmarks (YOLO-pose fine-tuned from `yolo11n-pose.pt`). Both can be exported/imported as a `.zip`
-  with a SHA-256 manifest.
+  numpy) and landmarks (YOLO-pose fine-tuned from `yolo11n-pose.pt`), both refinable from an imported model
+  (*Ritocco*). They and the outline models (YOLO-seg, imported only) can be exported/imported as a `.zip` with a
+  SHA-256 manifest.
+- **GuppyTraining kit** (`training_kit/`, own version, not in the app's release zip): pre-trains the outline,
+  landmark and colour models on the van der Bijl 2025 FRDR data on a PC with an NVIDIA card and writes them in the
+  app's export format. The app's code is bundled into the kit, so kit changes must keep the app's preprocessing.
 - **Layers**: `guppycolor/engine/` = stateless algorithms (plain functions, no project or GUI state);
   `guppycolor/*.py` = project, pipeline, export, training, landmarks, pattern; `guppycolor/gui/` = PySide6
   window, one screen per step. Keep that separation: engine code must stay testable without a window.
@@ -88,7 +98,7 @@ for, how it is built, the rules every change must follow, and how to organise th
 
 #### Recent versions (CHANGELOG)
 
-- **Unreleased**: New `training_kit/` (separate from the app, not in its release zip): standalone…
+- **Unreleased**: Manuals brought up to date (no change to the app or its numbers): README (landmark…; New `training_kit/` (separate from the app, not in its release zip): standalone…
 - **0.15.0 (2026-10-29)**: The eye is never black, also without a scale: on photos without a scale in mm (no graph…; Training > Show what the model sees leaves out the head as the analysis does (before, it…
 - **0.14.1 (2026-10-29)**: Review > Scale: after Calibrate manually the view shows the line you drew (not the…; A scale set by hand is no longer flagged `scale_off_session`.
 - **0.14.0 (2026-10-29)**: The app uses an NVIDIA graphics card: on a PC with one, `install_windows.bat` now…; 3 Analysis says where it runs (*Runs on: graphics card …* or *processor*), the seconds…
@@ -112,6 +122,8 @@ for, how it is built, the rules every change must follow, and how to organise th
 - Scale from a ruler in the photo (not only graph paper).
 - RAW photo support.
 - Verified update from GitHub releases (off while the repository is private).
+- *Compare with measures made by hand* reads the MorphoTracer `morphology.csv` (`<class>_area_mm2`, `sl_mm`,
+  `tl_mm`): today it takes the spot count column `<class>_n` for the area and does not match `sl_mm`/`tl_mm`.
 - Landmark model export as plain tensors (safetensors/npz) rebuilt locally on import, so a shared file never goes through an unpickler (security review suggestion).
 
 #### Species profiles
@@ -201,7 +213,8 @@ for, how it is built, the rules every change must follow, and how to organise th
 
 - **Run from source** (developers): Python 3.12, `pip install --require-hashes --only-binary=:all: -r
   requirements-win.txt`, then `pip install --no-deps -e .`; `python -m guppycolor` opens the window,
-  `python -m guppycolor run PROJECT` analyses without a window.
+  `python -m guppycolor run PROJECT` analyses without a window. With an NVIDIA card use
+  `requirements-win-cuda.txt` instead (same pins, CUDA torch).
 - **Tests**: `python -m pytest tests`. GitHub Actions (`.github/workflows/tests.yml`) runs them on Windows with
   Python 3.12 and the locked packages on every push and pull request.
 - **Release** (done by the maintainer, by hand):

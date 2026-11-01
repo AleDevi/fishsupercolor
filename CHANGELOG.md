@@ -17,9 +17,16 @@
 - Scale from a ruler in the photo (not only graph paper).
 - RAW photo support.
 - Verified update from GitHub releases (off while the repository is private).
+- *Compare with measures made by hand* reads the MorphoTracer `morphology.csv` (`<class>_area_mm2`, `sl_mm`,
+  `tl_mm`): today it takes the spot count column `<class>_n` for the area and does not match `sl_mm`/`tl_mm`.
 - Landmark model export as plain tensors (safetensors/npz) rebuilt locally on import, so a shared file never goes through an unpickler (security review suggestion).
 
 ## Unreleased
+- Manuals brought up to date (no change to the app or its numbers): README (landmark training on the graphics card
+  since 0.14.0, the colour start line in the Results legend, *How it works* with outline models and the colour start,
+  *What is missing* in line with *Planned*), MODELS_AND_TRAINING.md (the van der Bijl colour model is ready; results
+  of the GuppyTraining 0.3.0 run of 29 Oct 2026) and the kit's README (caudal fin base landmarks, updating the kit,
+  why its % black can be higher than the app's).
 - New `training_kit/` (separate from the app, not in its release zip): standalone pre-training on a PC with an
   NVIDIA card, without Guppy Colour or Claude installed. It places the van der Bijl et al. 2025 annotations (FRDR,
   CC BY 4.0) on their original photos and trains an outline model (body + caudal fin) and a landmark model (snout,

@@ -7,7 +7,7 @@ Pre-trains three Guppy Colour models on the photos and annotations of **van der 
 | Model | What it learns | From which annotation | File in `results` |
 | --- | --- | --- | --- |
 | Outline (YOLO-seg) | the fish in the whole photo, as two parts: **body** and **caudal fin** (also its transparent part) | `extracted_fish` (body + whole caudal fin), split at the line between landmarks 3 and 4 (start of the caudal fin) | `outline_vanderbijl.zip` |
-| Landmarks (YOLO-pose) | **snout**, **eye**, **end of the caudal peduncle**, **tail tip**, so SL and TL | `fixed_landmarks` (1 eye, 2 snout, 3-4 start of the caudal fin = `caudal_base_top`, `caudal_base_bottom`; their midpoint is the end of the peduncle); tail tip = point of the outline farthest from the snout | `landmarks_vanderbijl.zip` |
+| Landmarks (YOLO-pose) | **snout**, **eye**, **top** and **bottom of the caudal fin base** (from kit 0.3.0), **end of the caudal peduncle**, **tail tip**, so SL and TL | `fixed_landmarks` (1 eye, 2 snout, 3-4 start of the caudal fin = `caudal_base_top`, `caudal_base_bottom`; their midpoint is the end of the peduncle); tail tip = point of the outline farthest from the snout | `landmarks_vanderbijl.zip` |
 | Colours (random forest, as in the Training screen) | **orange**, **black** and **body without colour** per pixel | `carotenoid_coloration` and `melanic_coloration_v2` inside `extracted_fish` (pixels in both masks left out; no colour correction: their photos have no chart) | `colours_vanderbijl.zip` |
 
 The dorsal fin and the gonopodium are not in the van der Bijl annotations: the landmark model has the
@@ -35,7 +35,12 @@ GuppyTraining\
 ```
 
 The zips are read in place: do not unzip them. They may also sit in a subfolder of `data` (e.g. a copy of the whole
-van der Bijl folder). Unzip the kit itself to `C:\`: it makes the folder `C:\GuppyTraining`.
+van der Bijl folder). Unzip the kit itself to `C:\`: it makes the folder `C:\GuppyTraining` (Windows' *Extract
+all* may add one more level, e.g. `C:\GuppyTraining\GuppyTraining`: either works).
+
+**Updating the kit**: unzip the new version into a new, empty folder, never over the old one; move `data\` and
+`results\` from the old folder into it, run `install_training.bat`, then `start_training.bat` (finished steps are
+skipped). Details in the app's `MODELS_AND_TRAINING.md`.
 
 ## What `start_training.bat` does
 
@@ -55,7 +60,9 @@ van der Bijl folder). Unzip the kit itself to `C:\`: it makes the folder `C:\Gup
    theirs; landmark errors, SL and TL errors as % of their SL, also apart for the photos whose landmarks they
    placed by hand (the fairest check); % orange and % black against their `car_perc` and `mel_perc` (bias, mean
    absolute error, r) and pixel overlap per colour class; the 12 worst photos drawn in `report.html`.
-   Their annotations are mostly made by their own model: the numbers say how close we are to them.
+   Their annotations are mostly made by their own model: the numbers say how close we are to them. The colour
+   check counts the whole fish, head included, so the eye, shadows and fin edges can be called black there; Guppy
+   Colour leaves the head out (from 0.13.0), so its % black on the same fish can be lower.
 6. **Model files** in `results\`, in the layout of Guppy Colour's Export model button.
 
 If it stops (power cut, PC restarted), double-click `start_training.bat` again: finished steps are skipped and
@@ -65,7 +72,9 @@ an interrupted training resumes from its last round.
 
 - `landmarks_vanderbijl.zip`: Landmarks screen, Import model. Then refine it with your clicks.
 - `outline_vanderbijl.zip`: Settings > Fish outline, Import outline model… (Guppy Colour 0.11.0 or later).
-- `colours_vanderbijl.zip`: Training screen, Import model…, then Start from it with your strokes (0.12.0 or later).
+- `colours_vanderbijl.zip`: Training screen, Import model…, then Start from it with your strokes (0.12.0 or later;
+  0.13.0 or later keeps each class's true share when you refine it, and 0.15.0 or later leaves out the head also on
+  photos without a scale: use the latest app).
 
 ## Security
 
