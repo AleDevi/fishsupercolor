@@ -536,8 +536,11 @@ class TrainingPage(QWidget):
             for h in header:
                 cb.addItem(h, h)
             cb.setCurrentIndex(max(0, cb.findData(id_col if k == '__id__' else cols.get(k, ''))))
-            text = {'__id__': 'Fish id', 'mask_length': 'Total length (mm), vs outline length',
-                    'fish_area': 'Fish area (mm²)'}.get(k, f'Area {k} (mm²)')
+            text = {'__id__': 'Fish id', 'standard_length': 'Standard length SL (mm)',
+                    'total_length': 'Total length TL = SL + tail (mm)',
+                    'mask_length': 'Total length (mm), vs outline length', 'fish_area': 'Fish area (mm²)',
+                    'body_area': 'Body area without caudal fin (mm²)',
+                    'caudal_area': 'Caudal fin area (mm²)'}.get(k, f'Area {k} (mm²)')
             form.addRow(text, cb)
             boxes[k] = cb
         bb = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
@@ -554,7 +557,7 @@ class TrainingPage(QWidget):
                 lines.append(f'{k}: {s.get("n", 0)} fish matched, too few')
                 continue
             lo, hi = s['limits_of_agreement']
-            u = 'mm' if k == 'mask_length' else 'mm²'
+            u = verify.unit(k)
             lines.append(f"{k}: n={s['n']}, r={s['r']:.2f}, mean difference {s['mean_difference']:+.3f} {u}, "
                          f"mean absolute error {s['mean_abs_error']:.3f} {u} ({s['relative_error_pct']:.0f}%), "
                          f"limits of agreement {lo:+.3f} / {hi:+.3f} {u}")

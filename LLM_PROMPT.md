@@ -92,17 +92,17 @@ for, how it is built, the rules every change must follow, and how to organise th
 
 ### Current state (generated)
 
-- Version: **0.15.0** (`guppycolor/__init__.py` and `pyproject.toml`).
+- Version: **0.15.1** (`guppycolor/__init__.py` and `pyproject.toml`).
 - Target Python: **3.12** on Windows (tests and installer). Pinned in `requirements.in`: `ultralytics==8.4.183`.
 - App screens (README, Workflow): 1 Project; 2 Settings; 3 Analysis; 4 Review; 5 Results; 6 Pattern and clusters; 7 Training (colour classes); 8 Landmarks.
 
 #### Recent versions (CHANGELOG)
 
 - **Unreleased**: Manuals brought up to date (no change to the app or its numbers): README (landmark…; New `training_kit/` (separate from the app, not in its release zip): standalone…
+- **0.15.1 (2026-11-01)**: Training > Compare with measures made by hand reads the `morphology.csv` of the…
 - **0.15.0 (2026-10-29)**: The eye is never black, also without a scale: on photos without a scale in mm (no graph…; Training > Show what the model sees leaves out the head as the analysis does (before, it…
 - **0.14.1 (2026-10-29)**: Review > Scale: after Calibrate manually the view shows the line you drew (not the…; A scale set by hand is no longer flagged `scale_off_session`.
 - **0.14.0 (2026-10-29)**: The app uses an NVIDIA graphics card: on a PC with one, `install_windows.bat` now…; 3 Analysis says where it runs (*Runs on: graphics card …* or *processor*), the seconds…
-- **0.13.0 (2026-10-29)**: SL and TL follow the fish: SL goes from the snout to the end of the caudal peduncle…; Rounded end of the peduncle: two new optional landmarks, *top* and *bottom of the caudal…; Colours start behind the head: 2 mm behind the eye landmark; Landmarks guide the outline: a landmark outside the outline (typically the tail tip on a…; Review: Accept / Exclude / size only / size + colour are now in a box *The whole photo…; Size check against the folder: Settings > Scale > *Check* (default 10 %) sends to Review…; Colour Ritocco keeps the true share of each class: the new model no longer paints more…; Settings > Fish ID: the formats are explained (`\d`, `{3}`, `/`) and Try the formats on…; Training says when Settings measures size only, with a button to measure colours again.
 
 #### Planned (CHANGELOG)
 
@@ -122,8 +122,6 @@ for, how it is built, the rules every change must follow, and how to organise th
 - Scale from a ruler in the photo (not only graph paper).
 - RAW photo support.
 - Verified update from GitHub releases (off while the repository is private).
-- *Compare with measures made by hand* reads the MorphoTracer `morphology.csv` (`<class>_area_mm2`, `sl_mm`,
-  `tl_mm`): today it takes the spot count column `<class>_n` for the area and does not match `sl_mm`/`tl_mm`.
 - Landmark model export as plain tensors (safetensors/npz) rebuilt locally on import, so a shared file never goes through an unpickler (security review suggestion).
 
 #### Species profiles
@@ -152,7 +150,7 @@ for, how it is built, the rules every change must follow, and how to organise th
 | `guppycolor/scaleline.py` | Scale set by hand: a line drawn on a photo over a known length (ruler, graph paper, any object) and that length in mm. scale/<photo id>.json holds the line of… |
 | `guppycolor/sizes.py` | Sizes of one fish: from the outline first, then the landmarks win where they exist |
 | `guppycolor/training.py` | Colour-class training inside a project: brush strokes per photo -> random forest -> areas per class |
-| `guppycolor/verify.py` | Check the app against measures made by hand (one row per fish: total area per colour class in mm², total length, area) |
+| `guppycolor/verify.py` | Check the app against measures made by hand (one row per fish: total area per colour class in mm², lengths, areas) |
 | `guppycolor/engine/__init__.py` | Image-analysis algorithms (colour chart, segmentation, scale, morphometry) |
 | `guppycolor/engine/colour.py` | ColorChecker Classic 24 detection + per-image TPS-3D colour correction (Menesatti et al. 2012) |
 | `guppycolor/engine/labels.py` | Text written in the photo: QR code first, else handwritten/printed labels via OCR |
@@ -170,7 +168,7 @@ for, how it is built, the rules every change must follow, and how to organise th
 
 #### Tests
 
-- `test_app.py` (25), `test_gui.py` (5), `test_labels.py` (8), `test_landmarks.py` (19), `test_modelshare.py` (3), `test_outline.py` (5), `test_pattern.py` (8), `test_training.py` (12), `test_training_kit.py` (10).
+- `test_app.py` (25), `test_gui.py` (5), `test_labels.py` (8), `test_landmarks.py` (19), `test_modelshare.py` (3), `test_outline.py` (5), `test_pattern.py` (8), `test_training.py` (13), `test_training_kit.py` (10).
 
 <!-- AUTO:END -->
 

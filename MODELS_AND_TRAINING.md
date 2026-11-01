@@ -2,7 +2,7 @@
 
 One page for every model Guppy Colour uses: which ones exist, where they are saved, where to load them in the
 app, where to find the ones already trained, and how to train new ones on the app or with the **GuppyTraining**
-kit. Updated with every release (last update: app 0.15.0, GuppyTraining 0.3.0).
+kit. Updated with every release (last update: app 0.15.1, GuppyTraining 0.3.0).
 
 - [In short: what to use today](#in-short-what-to-use-today)
 - [The four kinds of model](#the-four-kinds-of-model)
@@ -161,8 +161,8 @@ The base models need no moving: each PC downloads them once.
 ## Is the model good?
 
 - **Colours and sizes**: 7 Training > **Compare with measures made by hand** (a table with the fish id and e.g.
-  `OrangeT`, `BlackT`, `Totallength`, `Area`): mean difference, mean absolute error, correlation, Bland-Altman
-  limits.
+  `OrangeT`, `BlackT`, `Totallength`, `Area`, or the `morphology.csv` of the MorphoTracer Fiji plugin, from 0.15.1):
+  mean difference, mean absolute error, correlation, Bland-Altman limits.
 - **Landmarks**: look at the points in 8 Landmarks and at the SL/TL in 5 Results; compare SL with hand measures as
   above.
 - **Outline**: 4 Review and the CSV column `outline_source`; the flags `outline_model_missed` and

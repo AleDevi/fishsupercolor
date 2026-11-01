@@ -195,9 +195,12 @@ Landmarks clicked in screen 8 (or placed by the landmark model) are used: the sn
 5. **Most uncertain first** sorts the photos by the model's confidence: strokes there help most.
 6. **Merge spots closer than** (mm) counts nearby spots as one, as when they are measured together by hand;
    **Ignore spots smaller than** (mm²) drops specks.
-7. **Compare with measures made by hand**: a table (xlsx or csv) with the fish id and the area of each class
-   in mm², and optionally total length and fish area (columns are recognised by name, e.g. `OrangeT`,
-   `BlackT`, `Totallength`, `Area`). It also works without a colour model, for sizes only. The app matches fish by label id, file-name id or file name, and reports per class: number of
+7. **Compare with measures made by hand**: a table (xlsx or csv) with the fish id (or the photo file name) and the
+   area of each class in mm², and optionally SL, TL, fish area, body area and caudal fin area (columns are
+   recognised by name, e.g. `OrangeT`, `BlackT`, `Totallength`, `Area`, or the `morphology.csv` of the MorphoTracer
+   Fiji plugin: `orange_area_mm2`, `sl_mm`, `tl_mm`, `body_area_mm2`, `caudal_area_mm2`; spot counts and
+   percentages are not used). `Totallength` is compared with the outline length, `tl_mm` with TL (SL + tail); check
+   the columns in the window that opens. It also works without a colour model, for sizes only. The app matches fish by label id, file-name id or file name, and reports per class: number of
    fish, mean difference, mean absolute error, correlation and Bland-Altman limits of agreement, with a plot
    (`export/validation_<model>.png`) and the pairs (`.csv`). Spots cannot be matched one by one, so the
    comparison is on the totals.
@@ -444,7 +447,6 @@ The full list, with the decisions behind it, is under *Planned* in [CHANGELOG.md
 - Dorsal fin and gonopodium as separate parts: annotation screen and body-part model. (Body and caudal fin are
   already separate with an outline model.) Ritocco for outline models.
 - A fallback when the automatic detector finds no fish on a white background.
-- Reading hand measures made with the MorphoTracer Fiji plugin directly in *Compare with measures made by hand*.
 - Spectra estimated from the photos (tested apart, not yet in the app).
 - Scale from a ruler; RAW photos (now JPEG/PNG/TIFF); Python 3.13.
 - Update check from GitHub releases (off while the repository is private).

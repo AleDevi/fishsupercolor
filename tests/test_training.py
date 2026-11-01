@@ -129,6 +129,21 @@ def test_verify_against_manual_areas(spotted, tmp_path):
     assert os.path.exists(csv_path) and os.path.exists(png)
 
 
+
+def test_guess_columns_morphotracer():
+    """MorphoTracer's morphology.csv: areas, not spot counts or %, and SL / TL / body and caudal areas."""
+    header = ['photo', 'folder', 'fish_id', 'sl_mm', 'tl_mm', 'body_area_mm2', 'caudal_area_mm2', 'orange_area_mm2',
+              'orange_n', 'orange_percent', 'orange_complete', 'black_area_mm2', 'black_n', 'black_percent']
+    rows = [['M0_a.jpg', 'f', '', '10', '13', '20', '5', '2', '3', '9', 'TRUE', '1', '2', '4']]
+    app_rows = [{'file': 'M0_a.jpg', 'label_id': 'NA', 'id': 'NA'}]
+    id_col, cols = verify.guess_columns(header, rows, app_rows,
+                                        ['orange', 'black', 'iridescent'])
+    assert id_col == 'photo'
+    assert cols == {'orange': 'orange_area_mm2', 'black': 'black_area_mm2', 'standard_length': 'sl_mm',
+                    'total_length': 'tl_mm', 'body_area': 'body_area_mm2', 'caudal_area': 'caudal_area_mm2'}
+    assert verify.unit('total_length') == 'mm' and verify.unit('body_area') == 'mm²'
+
+
 def test_size_only_photos(spotted):
     p = spotted
     paint_first(p)

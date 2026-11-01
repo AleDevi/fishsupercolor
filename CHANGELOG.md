@@ -17,8 +17,6 @@
 - Scale from a ruler in the photo (not only graph paper).
 - RAW photo support.
 - Verified update from GitHub releases (off while the repository is private).
-- *Compare with measures made by hand* reads the MorphoTracer `morphology.csv` (`<class>_area_mm2`, `sl_mm`,
-  `tl_mm`): today it takes the spot count column `<class>_n` for the area and does not match `sl_mm`/`tl_mm`.
 - Landmark model export as plain tensors (safetensors/npz) rebuilt locally on import, so a shared file never goes through an unpickler (security review suggestion).
 
 ## Unreleased
@@ -38,6 +36,14 @@
   class by its true share of the fish (0.2.1 over-predicted orange and black by about 3 points); kit 0.3.0 records
   that share in the model (`class_share`, used by app 0.13.0 Ritocco) and teaches the landmark model the top and
   bottom of the caudal fin base. Use the latest kit.
+
+## 0.15.1 (2026-11-01)
+- Training > **Compare with measures made by hand** reads the `morphology.csv` of the MorphoTracer Fiji plugin:
+  before, it took the number of spots (`orange_n`) as the orange area. Now it picks the area columns
+  (`orange_area_mm2`, `black_area_mm2`…) and leaves out spot counts, percentages and *complete* ticks. It also
+  compares SL (`sl_mm` with `standard_length_mm`), TL (`tl_mm` with `total_length_mm`, SL + tail in both), the body
+  area and the caudal fin area, and matches fish by the photo file name too. Older tables (`OrangeT`,
+  `Totallength`, `Area`) are read as before. Check the columns in the window that opens; no new analysis needed.
 
 ## 0.15.0 (2026-10-29)
 - **The eye is never black, also without a scale**: on photos without a scale in mm (no graph paper, e.g. the van
