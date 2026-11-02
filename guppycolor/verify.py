@@ -1,4 +1,5 @@
-"""Check the app against measures made by hand (one row per fish: total area per colour class in mm², total length, area).
+"""Check the app against measures made by hand (one row per fish: total area per colour class in mm², lengths, areas).
+Reads any table with one row per fish, e.g. the morphology.csv written by the MorphoTracer Fiji plugin.
 Spots measured by hand cannot be matched one by one, so the comparison is on the per-class totals:
 mean difference (bias), mean absolute error, correlation and Bland-Altman limits of agreement."""
 import csv
@@ -12,8 +13,20 @@ from . import export
 GUESS = {'orange': ('orange', 'aranc', 'carot', 'ora'), 'black': ('black', 'nero', 'blk', 'mel'),
          'iridescent': ('irid', 'blu', 'struct')}
 # sizes measured by hand: app column, header words (exact names for area, which every class column also contains)
-SIZES = {'mask_length': ('mask_length_mm', ('totallength', 'total_length', 'total length', 'tl')),
-         'fish_area': ('fish_area_mm2', ('area', 'area_mm2', 'fish area', 'fish_area', 'totalarea'))}
+# 'Totallength' of older hand tables is the outline length; MorphoTracer's tl_mm is SL + tail, as total_length_mm
+SIZES = {'standard_length': ('standard_length_mm', ('sl', 'sl_mm', 'standard_length', 'standard_length_mm',
+                                                    'standard length', 'standardlength')),
+         'total_length': ('total_length_mm', ('tl_mm', 'total_length_mm')),
+         'mask_length': ('mask_length_mm', ('totallength', 'total_length', 'total length', 'tl')),
+         'fish_area': ('fish_area_mm2', ('area', 'area_mm2', 'fish area', 'fish_area', 'fish_area_mm2', 'totalarea')),
+         'body_area': ('body_area_mm2', ('body_area', 'body_area_mm2', 'body area', 'bodyarea')),
+         'caudal_area': ('caudal_area_mm2', ('caudal_area', 'caudal_area_mm2', 'caudal area', 'caudalarea'))}
+# columns that hold something else than an area: spot counts, percentages, done ticks (e.g. MorphoTracer's orange_n)
+NOT_AREA = re.compile(r'perc|%|pct|_n$|^n_|count|complete|number')
+
+
+def unit(key):
+    return 'mm' if key.endswith('length') else 'mm²'
 
 
 def app_column(key):
@@ -43,6 +56,7 @@ def app_ids(row):
     """Every id the app knows for a fish: label id, file-name id, file stem."""
     out = {_norm_id(row[k]) for k in ('label_id', 'id') if row.get(k) not in (None, '', 'NA')}
     out.add(_norm_id(os.path.splitext(row['file'])[0]))
+    out.add(_norm_id(row['file']))
     return out
 
 
@@ -62,10 +76,14 @@ def guess_columns(header, rows, project_rows, keys):
                 break
     for k in keys:
         words = GUESS.get(k, (k[:4],))
-        cands = [h for h in header if h != id_col and any(w in h.lower() for w in words)
-                 and not any(x in h.lower() for x in ('perc', '%', 'pct'))]
-        # a total column (OrangeT, black_tot, total iridescent) beats single-spot columns (Orange1, Orange2…)
-        cands.sort(key=lambda h: (not re.search(r'(t|tot|total)$|^tot', h.lower().strip()), re.search(r'\d$', h) is not None))
+        cands = [h for h in header if h != id_col and h not in cols.values() and any(w in h.lower() for w in words)
+                 and not NOT_AREA.search(h.lower().strip())]
+
+        def rank(h):
+            # a total column (OrangeT, black_tot, total iridescent, orange_area_mm2) beats single spots (Orange1, Orange2…)
+            base = re.sub(r'_?mm2$', '', h.lower().strip())
+            return (not (re.search(r'(t|tot|total)$|^tot', base) or 'area' in base), re.search(r'\d$', base) is not None)
+        cands.sort(key=rank)
         if cands:
             cols[k] = cands[0]
     return id_col, cols
@@ -141,7 +159,7 @@ def plot(pairs, stats, path):
         lim = [0, max(m.max(), a.max()) * 1.05]
         ax[0, i].scatter(m, a, s=18, color='#3D7FD6')
         ax[0, i].plot(lim, lim, color='#888', lw=1)
-        u = 'mm' if k == 'mask_length' else 'mm²'
+        u = unit(k)
         ax[0, i].set(title=f"{k}  (n={s['n']}, r={s['r']:.2f})", xlabel=f'manual ({u})', ylabel=f'app ({u})', xlim=lim, ylim=lim)
         mean, d = (m + a) / 2, a - m
         ax[1, i].scatter(mean, d, s=18, color='#E8742A')

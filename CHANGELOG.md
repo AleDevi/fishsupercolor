@@ -20,6 +20,11 @@
 - Landmark model export as plain tensors (safetensors/npz) rebuilt locally on import, so a shared file never goes through an unpickler (security review suggestion).
 
 ## Unreleased
+- Manuals brought up to date (no change to the app or its numbers): README (landmark training on the graphics card
+  since 0.14.0, the colour start line in the Results legend, *How it works* with outline models and the colour start,
+  *What is missing* in line with *Planned*), MODELS_AND_TRAINING.md (the van der Bijl colour model is ready; results
+  of the GuppyTraining 0.3.0 run of 29 Oct 2026) and the kit's README (caudal fin base landmarks, updating the kit,
+  why its % black can be higher than the app's).
 - New `training_kit/` (separate from the app, not in its release zip): standalone pre-training on a PC with an
   NVIDIA card, without Guppy Colour or Claude installed. It places the van der Bijl et al. 2025 annotations (FRDR,
   CC BY 4.0) on their original photos and trains an outline model (body + caudal fin) and a landmark model (snout,
@@ -31,6 +36,14 @@
   class by its true share of the fish (0.2.1 over-predicted orange and black by about 3 points); kit 0.3.0 records
   that share in the model (`class_share`, used by app 0.13.0 Ritocco) and teaches the landmark model the top and
   bottom of the caudal fin base. Use the latest kit.
+
+## 0.15.1 (2026-11-01)
+- Training > **Compare with measures made by hand** reads the `morphology.csv` of the MorphoTracer Fiji plugin:
+  before, it took the number of spots (`orange_n`) as the orange area. Now it picks the area columns
+  (`orange_area_mm2`, `black_area_mm2`…) and leaves out spot counts, percentages and *complete* ticks. It also
+  compares SL (`sl_mm` with `standard_length_mm`), TL (`tl_mm` with `total_length_mm`, SL + tail in both), the body
+  area and the caudal fin area, and matches fish by the photo file name too. Older tables (`OrangeT`,
+  `Totallength`, `Area`) are read as before. Check the columns in the window that opens; no new analysis needed.
 
 ## 0.15.0 (2026-10-29)
 - **The eye is never black, also without a scale**: on photos without a scale in mm (no graph paper, e.g. the van

@@ -89,8 +89,9 @@ analysis at the next Start.
   the median of the session. **Check** (default 10 %) sends to Review the photos whose scale or fish length is
   further than that from the median of their folder (at least 3 photos; 0 switches it off; raise it when a folder
   holds fish of very different sizes). It does not change the numbers.
-- **Body parts**: caudal, dorsal fin and gonopodium can be included or excluded. Recorded in the CSV; the
-  separation itself comes with the body-part model.
+- **Body parts**: caudal, dorsal fin and gonopodium can be included or excluded. Recorded in the CSV. An outline
+  model (above) already draws the body and the caudal fin apart; the dorsal fin and the gonopodium come with the
+  body-part model (planned).
 - **Head of the fish**: left (default), right, or guessed in each photo. Used for lengths and alignment.
 - **File names**: a pattern such as `{id}_{tank}_{date}` turns parts of the file name into CSV columns.
 - **Fish ID**: where the fish id comes from:
@@ -151,6 +152,7 @@ Click a row to see how that fish was measured. The lines are drawn on the photo 
 - cyan: midline, from the snout (green) to the end of the outline (red) = `mask_length_mm`;
 - orange: end of the body at the caudal peduncle, only when the tail fin is in the outline (body area stops there);
 - yellow: maximum depth; white bar: 5 mm, when the scale is known;
+- yellow, dotted: where the colours start, behind the head (see 7 Training);
 - blue: the landmarks and what comes from them, as they are now (they change as soon as you click them on screen 8):
   SL line, TL (dashed, snout to tail tip), the end of the body across the peduncle, the maximum depth across the
   body at the gonopodium base.
@@ -193,9 +195,12 @@ Landmarks clicked in screen 8 (or placed by the landmark model) are used: the sn
 5. **Most uncertain first** sorts the photos by the model's confidence: strokes there help most.
 6. **Merge spots closer than** (mm) counts nearby spots as one, as when they are measured together by hand;
    **Ignore spots smaller than** (mm²) drops specks.
-7. **Compare with measures made by hand**: a table (xlsx or csv) with the fish id and the area of each class
-   in mm², and optionally total length and fish area (columns are recognised by name, e.g. `OrangeT`,
-   `BlackT`, `Totallength`, `Area`). It also works without a colour model, for sizes only. The app matches fish by label id, file-name id or file name, and reports per class: number of
+7. **Compare with measures made by hand**: a table (xlsx or csv) with the fish id (or the photo file name) and the
+   area of each class in mm², and optionally SL, TL, fish area, body area and caudal fin area (columns are
+   recognised by name, e.g. `OrangeT`, `BlackT`, `Totallength`, `Area`, or the `morphology.csv` of the MorphoTracer
+   Fiji plugin: `orange_area_mm2`, `sl_mm`, `tl_mm`, `body_area_mm2`, `caudal_area_mm2`; spot counts and
+   percentages are not used). `Totallength` is compared with the outline length, `tl_mm` with TL (SL + tail); check
+   the columns in the window that opens. It also works without a colour model, for sizes only. The app matches fish by label id, file-name id or file name, and reports per class: number of
    fish, mean difference, mean absolute error, correlation and Bland-Altman limits of agreement, with a plot
    (`export/validation_<model>.png`) and the pairs (`.csv`). Spots cannot be matched one by one, so the
    comparison is on the totals.
@@ -242,12 +247,12 @@ colour) and purple (reflection), then **Import strokes from Paint**.
 3. With 10–30 photos clicked, **Train** makes a landmark model (YOLO-pose, `models/landmarks_vN`). **Start from**
    chooses where it starts: the small public `yolo11n-pose.pt` weights (downloaded once and checked against their
    SHA-256), or **Ritocco**: a landmark model of the project, e.g. `landmarks_vanderbijl.zip` from the training kit
-   (pre-trained on about 1,600 van der Bijl 2025 photos), imported with **Import model…**. Ritocco refines it with
+   (pre-trained on about 1,570 van der Bijl 2025 photos), imported with **Import model…**. Ritocco refines it with
    your clicks in fewer rounds and with gentle steps, so a few photos adapt it to your setup without undoing what
    it learnt. Landmarks a model was never trained on (the kit's has no dorsal fin base and gonopodium base) are
-   not predicted until you click them on some photos and train again. The app trains on the
-   processor (its installer does not install the graphics-card version), so give it time; the GuppyTraining kit
-   uses an NVIDIA card ([MODELS_AND_TRAINING.md](MODELS_AND_TRAINING.md)). The new model is put in use; run the **Analysis** again to get SL (and
+   not predicted until you click them on some photos and train again. On a PC with an NVIDIA card the
+   training runs on the card (since 0.14.0, see Install); on the processor it is slower, so give it time
+   ([MODELS_AND_TRAINING.md](MODELS_AND_TRAINING.md)). The new model is put in use; run the **Analysis** again to get SL (and
    the landmarks) on every fish. Landmarks the model is unsure of (confidence < 0.5) are left out.
    A bar shows the training rounds; it may stop before the last one when the model no longer improves.
    **Export model… / Import model…** work as in Training (the model's landmarks must be among those of the
@@ -359,12 +364,18 @@ The whole folder can be copied to another computer (e.g. one with a GPU) and ope
 ## How it works
 
 - **Fish outline**: YOLOE with the text prompt "fish" finds the fish, SAM 2.1 draws its outline
-  (no training needed). One click in Review gives SAM a point instead.
+  (no training needed). One click in Review gives SAM a point instead. Or an imported outline model (YOLO
+  segmentation, e.g. from the GuppyTraining kit) draws the body and the caudal fin; where it fails, the automatic
+  detector is used. Landmarks outside the outline (e.g. the tail tip) grow it with SAM. On a PC with an NVIDIA card
+  these run on the card.
 - **Colour**: ColorChecker 24 located automatically; 3D thin-plate spline from measured to target values
   (Menesatti et al. 2012).
 - **Scale**: period of the graph-paper grid by autocorrelation around the fish, fitted over the whole paper
   patch (at least 20 squares, else doubtful); a 2 cm line along the grid is kept to show it in Review.
-- **Measures**: length along the outline's midline, maximum depth, areas; the eye marks the head.
+- **Measures**: from the outline first, then the landmarks win where they exist (`sizes.py`): SL and TL along the
+  outline's midline between landmarks, maximum depth, areas (body ends on the arc through the caudal fin base
+  landmarks). Colours are counted only behind the head: 2 mm behind the eye, else 3.5 mm behind the snout, else
+  (no scale) at 25% of the fish length (profile `colour_start`).
 - **Colour classes**: per-pixel features (CIELAB colour smoothed at 3 scales, edges, blob filters, local
   contrast) and a random forest trained on your strokes (as in ilastik). Pixels are classified inside the
   fish outline; spots are connected regions of a class.
@@ -398,13 +409,21 @@ guppycolor run PROJECT           analyse pending photos and write export/measure
 
 ## For developers
 
-- `guppycolor/engine/`: stateless algorithms (`colour`, `segment`, `scale`, `morpho`, `labels`, `pixels`).
+- `guppycolor/engine/`: stateless algorithms (`colour`, `segment`, `scale`, `morpho`, `labels`, `pixels`,
+  `pattern`).
 - `guppycolor/project.py`, `pipeline.py`, `export.py`: project, analysis of one photo, CSV.
+- `guppycolor/sizes.py`: SL, TL, depth and areas from the outline and the landmarks; `scaleline.py`: scale drawn
+  by hand; `outline.py`: imported outline models; `metadata.py`: file-name pattern and EXIF; `labelsheet.py`:
+  printable QR labels.
 - `guppycolor/training.py`, `verify.py`: colour-class training and comparison with manual measures.
 - `guppycolor/modelshare.py`: export/import of trained models as `.zip` (manifest with SHA-256).
 - `guppycolor/landmarks.py`: clicked landmarks, standard length, YOLO-pose dataset, training and prediction.
 - `guppycolor/pattern.py`, `engine/pattern.py`: alignment and clustering of the colour patterns.
-- `guppycolor/gui/`: PySide6 window (`main.py`, `training_page.py`, `pattern_page.py`, `landmarks_page.py`).
+- `guppycolor/gui/`: PySide6 window (`main.py`, `training_page.py`, `pattern_page.py`, `landmarks_page.py`,
+  `calibrate.py`, `modelfiles.py`).
+- `training_kit/`: the GuppyTraining kit (pre-training on the van der Bijl 2025 data on a PC with an NVIDIA card;
+  its own README, its own version in `training_kit/gctrain/__init__.py`, not in the app's release zip; zip built
+  with `python training_kit/build_kit.py OUT.zip`).
 - `guppycolor/profiles/*.json`: species profiles.
 - Tests: `python -m pytest tests` (synthetic photos, no model download).
 - GitHub Actions: `tests` runs the tests on Windows with Python 3.12 and the locked packages at every push and
@@ -421,10 +440,16 @@ guppycolor run PROJECT           analyse pending photos and write export/measure
 
 ## What is missing
 
-- Separate body parts (caudal, dorsal, gonopodium): annotation screen and model next.
-- Spectra estimated from the photos (module ready, not yet in the app).
+The full list, with the decisions behind it, is under *Planned* in [CHANGELOG.md](CHANGELOG.md). The main points:
+
+- Animal groups in one project (e.g. male / female, or species), each with its own profile; a female guppy profile
+  and a generic fish profile.
+- Dorsal fin and gonopodium as separate parts: annotation screen and body-part model. (Body and caudal fin are
+  already separate with an outline model.) Ritocco for outline models.
+- A fallback when the automatic detector finds no fish on a white background.
+- Spectra estimated from the photos (tested apart, not yet in the app).
+- Scale from a ruler; RAW photos (now JPEG/PNG/TIFF); Python 3.13.
 - Update check from GitHub releases (off while the repository is private).
-- RAW photos (now JPEG/PNG/TIFF): linear demosaicing before the colour correction.
 
 ## License
 

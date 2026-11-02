@@ -2,7 +2,7 @@
 
 One page for every model Guppy Colour uses: which ones exist, where they are saved, where to load them in the
 app, where to find the ones already trained, and how to train new ones on the app or with the **GuppyTraining**
-kit. Updated with every release (last update: app 0.15.0, GuppyTraining 0.3.0).
+kit. Updated with every release (last update: app 0.15.1, GuppyTraining 0.3.0).
 
 - [In short: what to use today](#in-short-what-to-use-today)
 - [The four kinds of model](#the-four-kinds-of-model)
@@ -22,7 +22,7 @@ kit. Updated with every release (last update: app 0.15.0, GuppyTraining 0.3.0).
 | --- | --- | --- |
 | Fish outline | *Automatic* (YOLOE + SAM 2.1). The van der Bijl outline model is better on photos like theirs, worse on graph paper with closed fins: try both on a few photos | 2 Settings > Fish outline |
 | Landmarks (SL, TL, depth) | Import `landmarks_vanderbijl.zip`, click the landmarks on 10–30 of your photos, **Train** with **Start from** = the imported model (Ritocco) | 8 Landmarks |
-| Colour classes | Your own model, trained with brush strokes; when the van der Bijl orange/black model is ready, import it and refine it with your strokes (Ritocco) | 7 Training |
+| Colour classes | Import `colours_vanderbijl.zip` (GuppyTraining 0.3.0: orange and black), check it with *Show what the model sees*, then refine it with your strokes on 5–10 of your photos (Ritocco). Or train your own model from strokes only | 7 Training |
 | Iridescent | Optional: off in new projects. Switch it on only if you need it, then paint it in Training | 2 Settings > What to measure |
 
 After changing a model, run **3 Analysis** again.
@@ -73,9 +73,9 @@ fewer is fine: the missing ones are not predicted until you train them).
 
 | Model | Trained on | Where | Notes |
 | --- | --- | --- | --- |
-| `landmarks_vanderbijl.zip` | about 1,570 van der Bijl 2025 photos (live males in a tank), GuppyTraining 0.1.1, 26 Oct 2026 | work PC: `Experiments\Padova\Guppy colouration automation\Risultati Training\results` | snout, eye, end of the caudal peduncle, tail tip; from kit 0.3.0 also the top and bottom of the caudal fin base (their end of the peduncle is the middle of those two: refine it with your clicks); no dorsal fin base, no gonopodium base (click those yourself). On their test photos SL error about 1.5%; on our graph-paper photos the snout/eye/peduncle are good on about half: use it as the start for Ritocco |
-| `outline_vanderbijl.zip` | same photos | same folder | body and caudal fin; on their photos overlap 0.98; on ours it often misses the closed, transparent caudal fin |
-| `colours_vanderbijl.zip` | van der Bijl orange and black masks (GuppyTraining 0.3.0) | lab PC `results` folder, then the work PC as above. Made with 0.2.1? Run the latest kit and import again: 0.2.1 overestimated orange and black by about 3 percentage points | orange, black and body without colour, no iridescent; their photos have no colour chart, so refine it on yours |
+| `landmarks_vanderbijl.zip` | about 1,570 van der Bijl 2025 photos (live males in a tank); last run GuppyTraining 0.3.0 on the lab PC, 29 Oct 2026 (first run 0.1.1, 26 Oct) | lab PC: `<kit folder>\results`; copy it to the work PC in `Experiments\Padova\Guppy colouration automation\Risultati Training\results` | snout, eye, end of the caudal peduncle, tail tip and, from kit 0.3.0, the top and bottom of the caudal fin base (their end of the peduncle is the middle of those two: refine it with your clicks); no dorsal fin base, no gonopodium base (click those yourself). On their 219 test photos: SL error 1.6%, TL 1.3%, caudal fin base points 1.6–1.8% of SL. On our graph-paper photos (26 Oct run) the snout/eye/peduncle were good on about half: use it as the start for Ritocco |
+| `outline_vanderbijl.zip` | same photos | same folder | body and caudal fin; on their test photos overlap 0.98; on ours it often misses the closed, transparent caudal fin |
+| `colours_vanderbijl.zip` | van der Bijl orange and black masks (GuppyTraining 0.3.0, 29 Oct 2026) | same folder | orange, black and body without colour, no iridescent. On their test photos % orange agrees well (r 0.92, bias −0.15 points), % black less (r 0.66): the kit's check counts the whole fish, so shadows, fin edges and the eye can be called black; the app leaves the head out (0.13.0, and 0.15.0 for photos without a scale). Their photos have no colour chart, so refine it on yours. A model made with kit 0.2.1 overestimates orange and black by about 3 points: use the 0.3.0 one |
 | your colour and landmark models | your photos | `models\` of each project | export them to reuse them |
 
 The report of that training (`report.html`) and the test on our photos (`prova_foto_Ale.html`) are in the same
@@ -122,8 +122,9 @@ the outline (tail included) in 4 Review first. Details in the README, section *7
 
 ## Training with GuppyTraining (PC with an NVIDIA card)
 
-GuppyTraining is a separate kit (`GuppyTraining_<version>.zip`) that pre-trains the outline and landmark models
-on the van der Bijl 2025 photos and annotations, without Claude and without the app's window.
+GuppyTraining is a separate kit (`GuppyTraining_<version>.zip`) that pre-trains the outline, landmark and colour
+models on the van der Bijl 2025 photos and annotations, without Claude and without the app's window. Its own guide
+is `README.md` inside the kit.
 
 You need: Windows, Python 3.12 from python.org ("Add python.exe to PATH" ticked), an up-to-date NVIDIA driver,
 internet the first time (about 3 GB of packages), about 30 GB free.
@@ -160,8 +161,8 @@ The base models need no moving: each PC downloads them once.
 ## Is the model good?
 
 - **Colours and sizes**: 7 Training > **Compare with measures made by hand** (a table with the fish id and e.g.
-  `OrangeT`, `BlackT`, `Totallength`, `Area`): mean difference, mean absolute error, correlation, Bland-Altman
-  limits.
+  `OrangeT`, `BlackT`, `Totallength`, `Area`, or the `morphology.csv` of the MorphoTracer Fiji plugin, from 0.15.1):
+  mean difference, mean absolute error, correlation, Bland-Altman limits.
 - **Landmarks**: look at the points in 8 Landmarks and at the SL/TL in 5 Results; compare SL with hand measures as
   above.
 - **Outline**: 4 Review and the CSV column `outline_source`; the flags `outline_model_missed` and

@@ -61,17 +61,27 @@ for, how it is built, the rules every change must follow, and how to organise th
 ## 3. How the app works
 
 - **Pipeline for one photo** (`pipeline.py`): colour correction (ColorChecker found automatically, 3D TPS to
-  nominal values or to a reference photo) → fish outline (YOLOE with the text prompt "fish" → SAM 2.1; a click in
-  Review prompts SAM instead) → scale (graph-paper grid by autocorrelation, or a line drawn by hand) → sizes
-  (outline first, landmarks win where they exist: `sizes.py`) → fish id (QR, else OCR constrained to expected
-  formats, or file name, or a data table) → colour classes (random forest trained in the app) → quality flags.
+  nominal values or to a reference photo) → fish outline (YOLOE with the text prompt "fish" → SAM 2.1, or an
+  imported outline model that draws body and caudal fin, with the automatic one as fallback; a click in Review
+  prompts SAM instead; landmarks outside the outline grow it) → scale (graph-paper grid by autocorrelation, or a
+  line drawn by hand) → sizes (outline first, landmarks win where they exist: `sizes.py`) → fish id (QR, else OCR
+  constrained to expected formats, or file name, or a data table) → colour classes (random forest trained in the
+  app, counted only behind the head: profile `colour_start`, 2 mm behind the eye, else behind the snout, else at
+  25% of the fish length without a scale; `pct_<class>` is a share of the whole fish) → quality flags.
+- **Graphics card**: the installer picks `requirements-win-cuda.txt` (CUDA builds of torch) when `nvidia-smi`
+  works; outline, landmarks and landmark training then run on the card (`segment.device()`), everything else on
+  the processor. Results must not depend on where they ran.
 - **Pixels until the export**: results are stored in pixels per photo (`results/<photo>.json`); conversion to mm
   happens in `export.py`, so a doubtful scale can fall back to the session median without a new analysis.
 - **Project** = one experiment = one folder (`project.json`, results, masks, models, exports). Photo folders
   (sessions) are added over time; only new or changed photos are analysed. Photos are never modified.
 - **Models trained in the app**: colour classes (random forest stored as plain `.npz` arrays, evaluated with
-  numpy) and landmarks (YOLO-pose fine-tuned from `yolo11n-pose.pt`). Both can be exported/imported as a `.zip`
-  with a SHA-256 manifest.
+  numpy) and landmarks (YOLO-pose fine-tuned from `yolo11n-pose.pt`), both refinable from an imported model
+  (*Ritocco*). They and the outline models (YOLO-seg, imported only) can be exported/imported as a `.zip` with a
+  SHA-256 manifest.
+- **GuppyTraining kit** (`training_kit/`, own version, not in the app's release zip): pre-trains the outline,
+  landmark and colour models on the van der Bijl 2025 FRDR data on a PC with an NVIDIA card and writes them in the
+  app's export format. The app's code is bundled into the kit, so kit changes must keep the app's preprocessing.
 - **Layers**: `guppycolor/engine/` = stateless algorithms (plain functions, no project or GUI state);
   `guppycolor/*.py` = project, pipeline, export, training, landmarks, pattern; `guppycolor/gui/` = PySide6
   window, one screen per step. Keep that separation: engine code must stay testable without a window.
@@ -82,17 +92,17 @@ for, how it is built, the rules every change must follow, and how to organise th
 
 ### Current state (generated)
 
-- Version: **0.15.0** (`guppycolor/__init__.py` and `pyproject.toml`).
+- Version: **0.15.1** (`guppycolor/__init__.py` and `pyproject.toml`).
 - Target Python: **3.12** on Windows (tests and installer). Pinned in `requirements.in`: `ultralytics==8.4.183`.
 - App screens (README, Workflow): 1 Project; 2 Settings; 3 Analysis; 4 Review; 5 Results; 6 Pattern and clusters; 7 Training (colour classes); 8 Landmarks.
 
 #### Recent versions (CHANGELOG)
 
-- **Unreleased**: New `training_kit/` (separate from the app, not in its release zip): standalone…
+- **Unreleased**: Manuals brought up to date (no change to the app or its numbers): README (landmark…; New `training_kit/` (separate from the app, not in its release zip): standalone…
+- **0.15.1 (2026-11-01)**: Training > Compare with measures made by hand reads the `morphology.csv` of the…
 - **0.15.0 (2026-10-29)**: The eye is never black, also without a scale: on photos without a scale in mm (no graph…; Training > Show what the model sees leaves out the head as the analysis does (before, it…
 - **0.14.1 (2026-10-29)**: Review > Scale: after Calibrate manually the view shows the line you drew (not the…; A scale set by hand is no longer flagged `scale_off_session`.
 - **0.14.0 (2026-10-29)**: The app uses an NVIDIA graphics card: on a PC with one, `install_windows.bat` now…; 3 Analysis says where it runs (*Runs on: graphics card …* or *processor*), the seconds…
-- **0.13.0 (2026-10-29)**: SL and TL follow the fish: SL goes from the snout to the end of the caudal peduncle…; Rounded end of the peduncle: two new optional landmarks, *top* and *bottom of the caudal…; Colours start behind the head: 2 mm behind the eye landmark; Landmarks guide the outline: a landmark outside the outline (typically the tail tip on a…; Review: Accept / Exclude / size only / size + colour are now in a box *The whole photo…; Size check against the folder: Settings > Scale > *Check* (default 10 %) sends to Review…; Colour Ritocco keeps the true share of each class: the new model no longer paints more…; Settings > Fish ID: the formats are explained (`\d`, `{3}`, `/`) and Try the formats on…; Training says when Settings measures size only, with a button to measure colours again.
 
 #### Planned (CHANGELOG)
 
@@ -140,7 +150,7 @@ for, how it is built, the rules every change must follow, and how to organise th
 | `guppycolor/scaleline.py` | Scale set by hand: a line drawn on a photo over a known length (ruler, graph paper, any object) and that length in mm. scale/<photo id>.json holds the line of… |
 | `guppycolor/sizes.py` | Sizes of one fish: from the outline first, then the landmarks win where they exist |
 | `guppycolor/training.py` | Colour-class training inside a project: brush strokes per photo -> random forest -> areas per class |
-| `guppycolor/verify.py` | Check the app against measures made by hand (one row per fish: total area per colour class in mm², total length, area) |
+| `guppycolor/verify.py` | Check the app against measures made by hand (one row per fish: total area per colour class in mm², lengths, areas) |
 | `guppycolor/engine/__init__.py` | Image-analysis algorithms (colour chart, segmentation, scale, morphometry) |
 | `guppycolor/engine/colour.py` | ColorChecker Classic 24 detection + per-image TPS-3D colour correction (Menesatti et al. 2012) |
 | `guppycolor/engine/labels.py` | Text written in the photo: QR code first, else handwritten/printed labels via OCR |
@@ -158,7 +168,7 @@ for, how it is built, the rules every change must follow, and how to organise th
 
 #### Tests
 
-- `test_app.py` (25), `test_gui.py` (5), `test_labels.py` (8), `test_landmarks.py` (19), `test_modelshare.py` (3), `test_outline.py` (5), `test_pattern.py` (8), `test_training.py` (12), `test_training_kit.py` (10).
+- `test_app.py` (25), `test_gui.py` (5), `test_labels.py` (8), `test_landmarks.py` (19), `test_modelshare.py` (3), `test_outline.py` (5), `test_pattern.py` (8), `test_training.py` (13), `test_training_kit.py` (10).
 
 <!-- AUTO:END -->
 
@@ -201,7 +211,8 @@ for, how it is built, the rules every change must follow, and how to organise th
 
 - **Run from source** (developers): Python 3.12, `pip install --require-hashes --only-binary=:all: -r
   requirements-win.txt`, then `pip install --no-deps -e .`; `python -m guppycolor` opens the window,
-  `python -m guppycolor run PROJECT` analyses without a window.
+  `python -m guppycolor run PROJECT` analyses without a window. With an NVIDIA card use
+  `requirements-win-cuda.txt` instead (same pins, CUDA torch).
 - **Tests**: `python -m pytest tests`. GitHub Actions (`.github/workflows/tests.yml`) runs them on Windows with
   Python 3.12 and the locked packages on every push and pull request.
 - **Release** (done by the maintainer, by hand):
